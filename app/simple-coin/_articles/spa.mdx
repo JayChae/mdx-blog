@@ -1,0 +1,203 @@
+# 간단한 SPA 웹페이지 구현
+
+블록체인 네트워크의 상태를 실시간으로 확인할 수 있는 웹 인터페이스입니다.
+
+## SPA 아키텍처
+
+Single Page Application의 기본 구조:
+
+```javascript
+function BlockchainDashboard() {
+  const [blocks, setBlocks] = useState([])
+  const [transactions, setTransactions] = useState([])
+  const [networkStats, setNetworkStats] = useState({})
+
+  useEffect(() => {
+    fetchBlockchainData()
+    const interval = setInterval(fetchBlockchainData, 10000) // 10초마다 갱신
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="dashboard">
+      <Header />
+      <NetworkStats stats={networkStats} />
+      <BlockList blocks={blocks} />
+      <TransactionList transactions={transactions} />
+    </div>
+  )
+}
+```
+
+## 실시간 데이터 관리
+
+WebSocket을 활용한 실시간 데이터 업데이트:
+
+```javascript
+useEffect(() => {
+  const ws = new WebSocket('ws://localhost:8080')
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data)
+    if (data.type === 'new_block') {
+      setBlocks((prev) => [data.block, ...prev])
+    } else if (data.type === 'new_transaction') {
+      setTransactions((prev) => [data.transaction, ...prev])
+    }
+  }
+
+  return () => ws.close()
+}, [])
+```
+
+## 컴포넌트 구조
+
+### 네트워크 통계 컴포넌트
+
+```javascript
+function NetworkStats({ stats }) {
+  return (
+    <div className="stats-grid">
+      <StatCard title="블록 높이" value={stats.blockHeight} />
+      <StatCard title="총 트랜잭션" value={stats.totalTransactions} />
+      <StatCard title="네트워크 해시레이트" value={stats.hashRate} />
+      <StatCard title="연결된 노드" value={stats.connectedNodes} />
+    </div>
+  )
+}
+```
+
+### 블록 리스트 컴포넌트
+
+```javascript
+function BlockList({ blocks }) {
+  return (
+    <div className="block-list">
+      <h3>최근 블록들</h3>
+      {blocks.map((block) => (
+        <BlockCard key={block.hash} block={block} />
+      ))}
+    </div>
+  )
+}
+```
+
+### 트랜잭션 리스트 컴포넌트
+
+```javascript
+function TransactionList({ transactions }) {
+  return (
+    <div className="transaction-list">
+      <h3>최근 트랜잭션들</h3>
+      {transactions.map((tx) => (
+        <TransactionCard key={tx.id} transaction={tx} />
+      ))}
+    </div>
+  )
+}
+```
+
+## 상태 관리
+
+React의 useReducer를 활용한 복잡한 상태 관리:
+
+```javascript
+const initialState = {
+  blocks: [],
+  transactions: [],
+  loading: false,
+  error: null,
+}
+
+function blockchainReducer(state, action) {
+  switch (action.type) {
+    case 'FETCH_START':
+      return { ...state, loading: true }
+    case 'FETCH_SUCCESS':
+      return {
+        ...state,
+        loading: false,
+        blocks: action.payload.blocks,
+        transactions: action.payload.transactions,
+      }
+    case 'FETCH_ERROR':
+      return { ...state, loading: false, error: action.payload }
+    default:
+      return state
+  }
+}
+```
+
+## 사용자 인터랙션
+
+### 트랜잭션 생성 폼
+
+```javascript
+function TransactionForm({ onSubmit }) {
+  const [formData, setFormData] = useState({
+    toAddress: '',
+    amount: '',
+    fee: '',
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit(formData)
+    setFormData({ toAddress: '', amount: '', fee: '' })
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        placeholder="받는 주소"
+        value={formData.toAddress}
+        onChange={(e) =>
+          setFormData({ ...formData, toAddress: e.target.value })
+        }
+      />
+      <input
+        type="number"
+        placeholder="금액"
+        value={formData.amount}
+        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+      />
+      <button type="submit">트랜잭션 전송</button>
+    </form>
+  )
+}
+```
+
+## 반응형 디자인
+
+모든 디바이스에서 잘 작동하는 반응형 UI:
+
+```css
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard {
+    grid-template-columns: 1fr 2fr;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+```
+
+## 성능 최적화
+
+대용량 데이터를 효율적으로 처리하기 위한 최적화:
+
+- **가상화**: 긴 리스트를 위한 react-window 사용
+- **메모이제이션**: React.memo와 useMemo 활용
+- **코드 스플리팅**: 라우트별 코드 분할
+- **지연 로딩**: 컴포넌트 지연 로딩

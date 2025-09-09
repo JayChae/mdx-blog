@@ -1,0 +1,65 @@
+# 간단한 트랜잭션 구현
+
+트랜잭션은 암호화폐의 전송을 기록하는 데이터 구조입니다.
+
+## 트랜잭션 구조
+
+기본적인 트랜잭션은 다음 요소들을 포함합니다:
+
+- **발신자 주소**: 암호화폐를 보내는 주소
+- **수신자 주소**: 암호화폐를 받는 주소
+- **전송 금액**: 보내는 암호화폐의 양
+- **수수료**: 채굴자에게 지불하는 수수료
+- **타임스탬프**: 트랜잭션 생성 시간
+
+## 트랜잭션 클래스 구현
+
+```javascript
+class Transaction {
+  constructor(fromAddress, toAddress, amount) {
+    this.fromAddress = fromAddress
+    this.toAddress = toAddress
+    this.amount = amount
+    this.timestamp = Date.now()
+  }
+
+  calculateHash() {
+    return crypto
+      .createHash('sha256')
+      .update(this.fromAddress + this.toAddress + this.amount + this.timestamp)
+      .digest('hex')
+  }
+}
+```
+
+## 디지털 서명
+
+트랜잭션의 무결성을 보장하기 위한 디지털 서명:
+
+```javascript
+signTransaction(signingKey) {
+  if (signingKey.getPublic('hex') !== this.fromAddress) {
+    throw new Error('유효하지 않은 서명 키')
+  }
+
+  const hashTx = this.calculateHash()
+  const sig = signingKey.sign(hashTx, 'base64')
+  this.signature = sig.toDER('hex')
+}
+```
+
+## 트랜잭션 검증
+
+네트워크에서 트랜잭션을 검증하는 과정:
+
+1. **서명 검증**: 발신자의 서명이 유효한지 확인
+2. **잔액 확인**: 발신자가 충분한 잔액을 가지고 있는지 확인
+3. **이중 지출 방지**: 동일한 암호화폐가 중복 사용되지 않았는지 확인
+
+## UTXO 모델
+
+Bitcoin에서 사용하는 트랜잭션 모델:
+
+- **UTXO**: 사용되지 않은 트랜잭션 출력
+- **입력**: 이전 트랜잭션의 UTXO 참조
+- **출력**: 새로운 UTXO 생성

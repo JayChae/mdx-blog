@@ -32,6 +32,14 @@ export default function SimpleCoinPage() {
               </li>
               <li>
                 <Link
+                  href="/simple-coin/network"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 블록체인 네트워크 구현
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/simple-coin/pow"
                   className="text-gray-600 transition-colors hover:text-gray-800"
                 >

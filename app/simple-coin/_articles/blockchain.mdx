@@ -1,0 +1,146 @@
+# 간단한 블록체인 구현
+
+블록체인은 연결된 블록들의 체인입니다. 각 블록은 데이터를 포함하며, 이전 블록의 해시값으로 연결됩니다.
+
+## 블록체인의 기본 구조
+
+블록체인은 다음과 같은 핵심 요소들로 구성됩니다:
+
+- **블록**: 데이터를 담는 기본 단위
+- **체인**: 블록들이 연결된 구조
+- **해시**: 블록의 무결성을 보장하는 암호화 함수
+- **합의 알고리즘**: 네트워크 참여자들의 합의 메커니즘
+
+## Block 클래스 구현
+
+```javascript
+class Block {
+  constructor(index, timestamp, data, previousHash = '') {
+    this.index = index
+    this.timestamp = timestamp
+    this.data = data
+    this.previousHash = previousHash
+    this.hash = this.calculateHash()
+    this.nonce = 0
+  }
+
+  calculateHash() {
+    return crypto
+      .createHash('sha256')
+      .update(
+        this.index +
+          this.previousHash +
+          this.timestamp +
+          JSON.stringify(this.data) +
+          this.nonce,
+      )
+      .digest('hex')
+  }
+}
+```
+
+## Blockchain 클래스 구현
+
+블록들을 관리하는 블록체인 클래스:
+
+```javascript
+class Blockchain {
+  constructor() {
+    this.chain = [this.createGenesisBlock()]
+    this.difficulty = 4
+  }
+
+  createGenesisBlock() {
+    return new Block(0, Date.now(), 'Genesis Block', '0')
+  }
+
+  getLatestBlock() {
+    return this.chain[this.chain.length - 1]
+  }
+
+  addBlock(newBlock) {
+    newBlock.previousHash = this.getLatestBlock().hash
+    newBlock.mineBlock(this.difficulty)
+    this.chain.push(newBlock)
+  }
+
+  isChainValid() {
+    for (let i = 1; i < this.chain.length; i++) {
+      const currentBlock = this.chain[i]
+      const previousBlock = this.chain[i - 1]
+
+      if (currentBlock.hash !== currentBlock.calculateHash()) {
+        return false
+      }
+
+      if (currentBlock.previousHash !== previousBlock.hash) {
+        return false
+      }
+    }
+    return true
+  }
+}
+```
+
+## 해시 함수의 역할
+
+SHA-256 해시 함수는 블록체인에서 다음과 같은 역할을 합니다:
+
+### 1. 무결성 보장
+
+- 블록 데이터가 변경되면 해시값이 완전히 바뀜
+- 데이터 변조를 즉시 감지 가능
+
+### 2. 연결성 유지
+
+- 각 블록이 이전 블록의 해시를 포함
+- 블록 간의 강력한 연결 고리 형성
+
+### 3. 작업 증명
+
+- Proof-of-Work에서 난이도 조건 충족
+- 네트워크 보안을 위한 계산 작업 제공
+
+## 블록체인의 장점
+
+### 투명성
+
+- 모든 트랜잭션이 공개적으로 기록됨
+- 누구나 블록체인을 검증할 수 있음
+
+### 불변성
+
+- 한번 기록된 데이터는 변경 불가능
+- 해시 체인으로 데이터 무결성 보장
+
+### 분산화
+
+- 중앙 서버 없이 P2P 네트워크로 운영
+- 단일 장애점 제거
+
+### 보안성
+
+- 암호화 기술로 데이터 보호
+- 합의 알고리즘으로 공격 방어
+
+## 실제 사용 사례
+
+### 암호화폐
+
+- Bitcoin, Ethereum 등의 가상 화폐
+- 디지털 자산의 소유권과 거래 기록
+
+### 공급망 관리
+
+- 제품 출처와 이동 경로 추적
+- 위조품 방지 및 투명성 확보
+
+### 의료 데이터
+
+- 환자 기록의 안전한 저장과 공유
+- 데이터 무결성과 개인정보 보호
+
+### 투표 시스템
+
+- 투표 조작 방지
+- 투표 결과의 투명한 검증

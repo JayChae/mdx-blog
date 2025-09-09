@@ -1,0 +1,94 @@
+# 간단한 Mempool 구현
+
+Mempool은 아직 블록에 포함되지 않은 대기 중인 트랜잭션들을 저장하는 공간입니다.
+
+## Mempool의 역할
+
+블록체인 네트워크에서 Mempool은 다음과 같은 기능을 수행합니다:
+
+- **트랜잭션 임시 저장**: 블록에 포함되기 전 대기
+- **우선순위 관리**: 수수료에 따른 정렬
+- **중복 방지**: 동일 트랜잭션의 재전송 방지
+- **용량 관리**: 메모리 사용량 제한
+
+## 기본 Mempool 구현
+
+```javascript
+class Mempool {
+  constructor() {
+    this.transactions = []
+    this.maxSize = 1000 // 최대 트랜잭션 수
+  }
+
+  addTransaction(transaction) {
+    // 중복 확인
+    if (this.transactions.find((tx) => tx.id === transaction.id)) {
+      return false
+    }
+
+    // 용량 초과 시 낮은 수수료 트랜잭션 제거
+    if (this.transactions.length >= this.maxSize) {
+      this.transactions.sort((a, b) => a.fee - b.fee)
+      this.transactions.shift()
+    }
+
+    this.transactions.push(transaction)
+    return true
+  }
+
+  getTransactions() {
+    return this.transactions
+  }
+}
+```
+
+## 트랜잭션 우선순위
+
+Mempool에서 트랜잭션을 정렬하는 기준:
+
+1. **수수료 우선**: 높은 수수료를 가진 트랜잭션 우선
+2. **도착 시간**: 먼저 도착한 트랜잭션 우선
+3. **크기 고려**: 트랜잭션 크기에 따른 효율성 계산
+
+## Mempool 정책
+
+### 수수료 기반 정책
+
+```javascript
+// 수수료율 계산 (satoshi per byte)
+calculateFeeRate(transaction) {
+  return transaction.fee / transaction.size
+}
+```
+
+### 시간 기반 정책
+
+```javascript
+// 오래된 트랜잭션 우선 제거
+cleanupOldTransactions() {
+  const now = Date.now()
+  const maxAge = 24 * 60 * 60 * 1000 // 24시간
+
+  this.transactions = this.transactions.filter(tx =>
+    (now - tx.timestamp) < maxAge
+  )
+}
+```
+
+## 보안 고려사항
+
+Mempool 관리 시 고려해야 할 보안 이슈들:
+
+- **DoS 공격 방어**: 악의적인 트랜잭션으로 가득 채우기 방지
+- **스팸 트랜잭션 필터링**: 의미 없는 트랜잭션 거부
+- **메모리 제한**: 시스템 리소스 보호
+- **재전송 제한**: 동일 트랜잭션의 반복 전송 방지
+
+## 확장성과 최적화
+
+대형 네트워크를 위한 Mempool 최적화:
+
+- **데이터베이스 사용**: 대용량 트랜잭션 저장
+- **인덱싱**: 빠른 검색을 위한 인덱스 구축
+- **압축**: 저장 공간 최적화
+- **분산**: 여러 노드에 걸친 Mempool 분산
