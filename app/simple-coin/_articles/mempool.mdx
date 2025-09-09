@@ -1,94 +1,164 @@
-# 간단한 Mempool 구현
+# Simple mempool
 
-Mempool은 아직 블록에 포함되지 않은 대기 중인 트랜잭션들을 저장하는 공간입니다.
+블록을 채굴하는 채굴자만 거래할 수 있다면 코인을 거래하기가 매우 힘들겠죠. 이번에는 블록에 추가되지 않은 트렌잭션을 보관하는 기능을 구현합니다. 비트코인에서는 이러한 트랜잭션을 보관하는 장소를 mempool이라고 부릅니다.
 
-## Mempool의 역할
+일반적으로 누군가가 트랜잭션을 블록체인에 포함시키고자 할 때(= 어떤 주소로 코인을 보내고자 할 때) 그 트랜잭션을 네트워크에 전파합니다. 이후 어떤 노드가 그 블록을 채굴했을 때, 블록에 넣어주는 방식입니다.
 
-블록체인 네트워크에서 Mempool은 다음과 같은 기능을 수행합니다:
+따라서 노드들이 서로 통신할 때는 두 가지 종류의 데이터를 공유하게 됩니다:
 
-- **트랜잭션 임시 저장**: 블록에 포함되기 전 대기
-- **우선순위 관리**: 수수료에 따른 정렬
-- **중복 방지**: 동일 트랜잭션의 재전송 방지
-- **용량 관리**: 메모리 사용량 제한
+1. 블록체인 (= 블록과 그 안에 포함된 트랜잭션들)
+2. mempool (= 아직 블록체인에 포함되지 않은 트랜잭션들)
 
-## 기본 Mempool 구현
+```ts
+let mempool: Transaction[] = []
+```
 
-```javascript
-class Mempool {
-  constructor() {
-    this.transactions = []
-    this.maxSize = 1000 // 최대 트랜잭션 수
+새로운 엔드포인트를 추가합니다: `POST /sendTransaction`
+이 메서드는 기존 지갑 기능을 기반으로 새로운 트랜잭션을 생성하여 mempool에 추가하고 네트워크로 전파합니다.
+
+```ts
+app.post('/sendTransaction', (req, res) => {
+  try {
+    const address = req.body.address
+    const amount = req.body.amount
+
+    if (address === undefined || amount === undefined) {
+      throw Error('invalid address or amount')
+    }
+    const tx = sendTransaction(address, amount)
+    broadcastMempool()
+    res.send(tx)
+  } catch (e) {
+    if (e instanceof Error) {
+      console.log(e.message)
+      res.status(400).send(e.message)
+    } else {
+      console.log(e)
+      res.status(400).send('unknown error')
+    }
   }
+})
+```
 
-  addTransaction(transaction) {
-    // 중복 확인
-    if (this.transactions.find((tx) => tx.id === transaction.id)) {
+## 트랜잭션 생성
+
+트랜잭션을 생성하는 과정은 이전과 동일합니다. 단지, 이번에는 바로 블록을 채굴해서 추가하지 않고, 생성된 트랜잭션을 mempool에 추가g합니다
+
+```ts
+const sendTransaction = (address: string, amount: number): Transaction => {
+  const tx: Transaction = createTransaction(
+    address,
+    amount,
+    getPrivateFromWallet(),
+    getUnspentTxOuts(),
+    getTransactionPool(),
+  )
+  addToTransactionPool(tx, getUnspentTxOuts())
+  return tx
+}
+```
+
+## 브로드캐스팅 (Broadcasting)
+
+미확인 트랜잭션의 핵심은 네트워크 전체로 전파되고, 결국 어떤 노드가 블록을 채굴하여 그 트랜잭션을 담아준다는 점입니다. 이를 처리하기 위해 미확인 트랜잭션 네트워킹에 대해 다음과 같은 간단한 규칙이 있어야 합니다:
+
+1. 노드가 이전에 본 적 없는 트랜잭션을 받으면, 전체 mempool를 모든 피어에게 전파합니다.
+2. 노드가 다른 노드에 처음 연결될 때, 상대 노드의 mempool를 요청(query)합니다.
+
+이를 위해 두 가지 새로운 MessageType을 추가합니다:
+
+```ts
+enum MessageType {
+  QUERY_LATEST = 0, //최신 블록 요청
+  QUERY_ALL = 1, // 전체 블록 요청
+  RESPONSE_BLOCKCHAIN = 2, // 블록 응답
+  QUERY_MEMPOOL = 3, // mempool 요청
+  RESPONSE_MEMPOOL = 4, // mempool 응답
+}
+```
+
+노드가 트랜잭션을 받았을 때 트랜잭션이 유효한지 검사하고 이전에 없던 거래인지 검사한 후에 mempool에 추가합니다. 만약 추가하는 데 성공했다면, 또다시 mempool를 모든 피어에게 전파합니다.
+
+![]()
+
+## 트랜잭션 검증
+
+트랜잭션을 mempool에 추가하기 전에 반드시 검증해야 합니다. 기존의 모든 트랜잭션 검증 규칙이 적용됩니다. 예를 들어, 트랜잭션은 올바른 형식을 가져야 하며, 서명이 유효해야 합니다.
+
+그리고 새로운 규칙을 하나 추가해야 합니다.
+트랜잭션의 인풋 중 하나라도 이미 기존 트랜잭션 풀에 존재한다면 그 트랜잭션은 풀에 추가될 수 없습니다.
+
+```ts
+const isValidTxForMempool = (
+  tx: Transaction,
+  aMempool: Transaction[],
+): boolean => {
+  const txPoolIns: TxIn[] = getTxPoolIns(aMempool)
+
+  for (const txIn of tx.txIns) {
+    if (
+      txPoolIns.some(
+        (poolIn) =>
+          txIn.txOutId === poolIn.txOutId &&
+          txIn.txOutIndex === poolIn.txOutIndex,
+      )
+    ) {
+      console.log('txIn already found in the txPool')
       return false
     }
-
-    // 용량 초과 시 낮은 수수료 트랜잭션 제거
-    if (this.transactions.length >= this.maxSize) {
-      this.transactions.sort((a, b) => a.fee - b.fee)
-      this.transactions.shift()
-    }
-
-    this.transactions.push(transaction)
-    return true
   }
-
-  getTransactions() {
-    return this.transactions
-  }
+  return true
 }
 ```
 
-## 트랜잭션 우선순위
+![]()
 
-Mempool에서 트랜잭션을 정렬하는 기준:
+## mempool에서 블록체인으로
 
-1. **수수료 우선**: 높은 수수료를 가진 트랜잭션 우선
-2. **도착 시간**: 먼저 도착한 트랜잭션 우선
-3. **크기 고려**: 트랜잭션 크기에 따른 효율성 계산
+노드가 블록 채굴하면 mempool에 있던 트랜잭션들을 새로운 블록 후보에 포함시킵니다.
 
-## Mempool 정책
+트랜잭션들은 풀에 추가되기 전에 이미 검증되었으므로, 이 시점에서는 별도의 추가 검증을 수행하지 않습니다.
 
-### 수수료 기반 정책
-
-```javascript
-// 수수료율 계산 (satoshi per byte)
-calculateFeeRate(transaction) {
-  return transaction.fee / transaction.size
-}
-```
-
-### 시간 기반 정책
-
-```javascript
-// 오래된 트랜잭션 우선 제거
-cleanupOldTransactions() {
-  const now = Date.now()
-  const maxAge = 24 * 60 * 60 * 1000 // 24시간
-
-  this.transactions = this.transactions.filter(tx =>
-    (now - tx.timestamp) < maxAge
+```ts
+const generateBlock = () => {
+  const coinbaseTx: Transaction = getCoinbaseTransaction(
+    getPublicFromWallet(),
+    getLatestBlock().index + 1,
   )
+  const blockData: Transaction[] = [coinbaseTx, ...getMempool()]
+  return generateRawBlock(blockData)
 }
 ```
 
-## 보안 고려사항
+## mempool 업데이트
 
-Mempool 관리 시 고려해야 할 보안 이슈들:
+새로운 트랜잭션이 포함된 블록이 채굴될 때마다 반드시 mempool을 다시 검증해야 합니다. 새로운 블록에 포함된 트랜잭션으로 인해 트랜잭션 풀에 있는 일부 트랜잭션이 유효하지 않게 될 수 있기 때문입니다. 예를 들어:
 
-- **DoS 공격 방어**: 악의적인 트랜잭션으로 가득 채우기 방지
-- **스팸 트랜잭션 필터링**: 의미 없는 트랜잭션 거부
-- **메모리 제한**: 시스템 리소스 보호
-- **재전송 제한**: 동일 트랜잭션의 반복 전송 방지
+- 풀에 있던 트랜잭션이 (자신의 노드 또는 다른 노드에 의해) 채굴된 경우
+- 확인되지 않은 트랜잭션이 참조하는 미사용 트랜잭션 출력(UTXO)이 다른 트랜잭션에 의해 사용된 경우
 
-## 확장성과 최적화
+트랜잭션 풀은 아래 코드로 업데이트되며, 현재 미사용 트랜잭션 출력(UTXO)만 알면 트랜잭션을 풀에서 제거해야 하는지 여부를 판단할 수 있습니다.
 
-대형 네트워크를 위한 Mempool 최적화:
+```ts
+const updateMempool = (unspentTxOuts: UnspentTxOut[]) => {
+  const validTxs = mempool.filter((tx) =>
+    tx.txIns.every((txIn) => hasTxInUnspentTxOuts(txIn, unspentTxOuts)),
+  )
 
-- **데이터베이스 사용**: 대용량 트랜잭션 저장
-- **인덱싱**: 빠른 검색을 위한 인덱스 구축
-- **압축**: 저장 공간 최적화
-- **분산**: 여러 노드에 걸친 Mempool 분산
+  if (validTxs.length < mempool.length) {
+    const validTxSet = new Set(validTxs)
+    const invalidTxs = mempool.filter((tx) => !validTxSet.has(tx))
+    console.log(
+      'removing the following transactions from mempool: %s',
+      JSON.stringify(invalidTxs),
+    )
+    mempool = validTxs
+  }
+}
+```
+
+![]()
+
+## 다음 챕터
+
+이제 simple-coin을 쉽게 체험해보기 위해 도커를 설정하고 SPA 웹도 만들어 UI로 확인해보겠습니다.
