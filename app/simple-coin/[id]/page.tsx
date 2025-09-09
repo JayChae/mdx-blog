@@ -48,7 +48,12 @@ async function ProjectPage({ params }: ProjectPageProps) {
     return notFound()
   }
 
-  return <ArticleWithNavigation params={resolvedParams} Article={Article} />
+  return (
+    <>
+      <ArticleWithNavigation params={resolvedParams} Article={Article} />
+      <ClientPrismWrapper />
+    </>
+  )
 }
 
 function ArticleWithNavigation({
@@ -100,7 +105,6 @@ function ArticleWithNavigation({
           <div className="w-32" /> // Spacer for alignment
         )}
       </div>
-      <ClientPrismWrapper />
     </div>
   )
 }
