@@ -1,13 +1,20 @@
 import { notFound } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { ComponentType } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
+import Blockchain from '../_articles/blockchain.mdx'
+import Network from '../_articles/network.mdx'
+import Pow from '../_articles/pow.mdx'
+import Transaction from '../_articles/transaction.mdx'
+import Wallet from '../_articles/wallet.mdx'
+import Mempool from '../_articles/mempool.mdx'
+import Spa from '../_articles/spa.mdx'
+
 interface ProjectPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 // 아티클 목록을 순서대로 정의
@@ -22,23 +29,24 @@ const articleOrder = [
 ]
 
 const articleComponents: Record<string, ComponentType> = {
-  blockchain: dynamic(() => import('../_articles/blockchain.mdx')),
-  network: dynamic(() => import('../_articles/network.mdx')),
-  pow: dynamic(() => import('../_articles/pow.mdx')),
-  transaction: dynamic(() => import('../_articles/transaction.mdx')),
-  wallet: dynamic(() => import('../_articles/wallet.mdx')),
-  mempool: dynamic(() => import('../_articles/mempool.mdx')),
-  spa: dynamic(() => import('../_articles/spa.mdx')),
+  blockchain: Blockchain,
+  network: Network,
+  pow: Pow,
+  transaction: Transaction,
+  wallet: Wallet,
+  mempool: Mempool,
+  spa: Spa,
 }
 
-function ProjectPage({ params }: ProjectPageProps) {
-  const Article = articleComponents[params.id]
+async function ProjectPage({ params }: ProjectPageProps) {
+  const resolvedParams = await params
+  const Article = articleComponents[resolvedParams.id]
 
   if (!Article) {
     return notFound()
   }
 
-  return <ArticleWithNavigation params={params} Article={Article} />
+  return <ArticleWithNavigation params={resolvedParams} Article={Article} />
 }
 
 function ArticleWithNavigation({
