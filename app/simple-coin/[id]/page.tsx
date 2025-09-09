@@ -11,6 +11,8 @@ import Wallet from '../_articles/wallet.mdx'
 import Mempool from '../_articles/mempool.mdx'
 import Spa from '../_articles/spa.mdx'
 
+import ClientPrismWrapper from '#/app/_components/common/prism'
+
 interface ProjectPageProps {
   params: Promise<{
     id: string
@@ -98,6 +100,7 @@ function ArticleWithNavigation({
           <div className="w-32" /> // Spacer for alignment
         )}
       </div>
+      <ClientPrismWrapper />
     </div>
   )
 }

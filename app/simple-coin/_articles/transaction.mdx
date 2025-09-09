@@ -1,65 +1,334 @@
-# 간단한 트랜잭션 구현
+# Simple Transactions
 
-트랜잭션은 암호화폐의 전송을 기록하는 데이터 구조입니다.
+## 트랜잭션(transactions)
+
+트랜잭션이 추가되면서 우리의 프로젝트는 "범용" 블록체인에서 암호화폐(cryptocurrency)로 전환됩니다. 이제 소유권을 증명할 수 있다면 특정 주소로 코인을 전송할 수 있습니다.
+
+트랜잭션을 이해하기 위해서는 트랜잭션 인풋(inputs)과 아웃풋(outputs), 공개 키 암호 방식(public-key cryptography), 서명(signatures)에 대해 알아야 합니다.
 
 ## 트랜잭션 구조
 
-기본적인 트랜잭션은 다음 요소들을 포함합니다:
+트랜잭션은 3 가지 구성 요소로 이루어집니다: 입력(inputs), 출력(outputs), ID입니다.
 
-- **발신자 주소**: 암호화폐를 보내는 주소
-- **수신자 주소**: 암호화폐를 받는 주소
-- **전송 금액**: 보내는 암호화폐의 양
-- **수수료**: 채굴자에게 지불하는 수수료
-- **타임스탬프**: 트랜잭션 생성 시간
-
-## 트랜잭션 클래스 구현
-
-```javascript
+```ts
 class Transaction {
-  constructor(fromAddress, toAddress, amount) {
-    this.fromAddress = fromAddress
-    this.toAddress = toAddress
+  public id: string
+  public txIns: TxIn[] //인풋
+  public txOuts: TxOut[] //아웃풋
+
+  constructor(id: string, txIns: TxIn[], txOuts: TxOut[]) {
+    this.id = id
+    this.txIns = txIns
+    this.txOuts = txOuts
+  }
+}
+```
+
+### Outputs
+
+코인이 어디로 얼만큼 전송되는지를 명시합니다.
+
+```ts
+class TxOut {
+  public address: string
+  public amount: number
+
+  constructor(address: string, amount: number) {
+    this.address = address
     this.amount = amount
-    this.timestamp = Date.now()
-  }
-
-  calculateHash() {
-    return crypto
-      .createHash('sha256')
-      .update(this.fromAddress + this.toAddress + this.amount + this.timestamp)
-      .digest('hex')
   }
 }
 ```
 
-## 디지털 서명
+### Inputs
 
-트랜잭션의 무결성을 보장하기 위한 디지털 서명:
+전송되는 코인이 실제로 존재하고 '송신자'가 소유하고 있다는 증명을 제공합니다. 입력은 항상 기존의 미사용 출력인 UTXO(unspent output)을 참조합니다.
 
-```javascript
-signTransaction(signingKey) {
-  if (signingKey.getPublic('hex') !== this.fromAddress) {
-    throw new Error('유효하지 않은 서명 키')
+```ts
+class TxIn {
+  public txOutId: string
+  public txOutIndex: number
+  public signature: string
+
+  constructor(txOutId: string, txOutIndex: number, signature: string) {
+    this.txOutId = txOutId
+    this.txOutIndex = txOutIndex
+    this.signature = signature
   }
-
-  const hashTx = this.calculateHash()
-  const sig = signingKey.sign(hashTx, 'base64')
-  this.signature = sig.toDER('hex')
 }
 ```
 
-## 트랜잭션 검증
+![utxo](https://github.com/user-attachments/assets/12461321-bc54-4d3d-b28e-79efb256e0e4)
 
-네트워크에서 트랜잭션을 검증하는 과정:
+### Id
 
-1. **서명 검증**: 발신자의 서명이 유효한지 확인
-2. **잔액 확인**: 발신자가 충분한 잔액을 가지고 있는지 확인
-3. **이중 지출 방지**: 동일한 암호화폐가 중복 사용되지 않았는지 확인
+트랜잭션의 인풋과 아웃풋을 해싱하여 id를 생성합니다. 인풋의 서명은 나중에 트랜잭션에 추가되므로 트랜잭션 해시에 포함되지 않습니다.
 
-## UTXO 모델
+![id](https://github.com/user-attachments/assets/1212bd36-01a0-4719-8aa2-0e00c9a0a262)
 
-Bitcoin에서 사용하는 트랜잭션 모델:
+```ts
+const getTransactionId = (transaction: Transaction): string => {
+  const txInContent: string = transaction.txIns
+    .map((txIn: TxIn) => txIn.txOutId + txIn.txOutIndex)
+    .join('')
 
-- **UTXO**: 사용되지 않은 트랜잭션 출력
-- **입력**: 이전 트랜잭션의 UTXO 참조
-- **출력**: 새로운 UTXO 생성
+  const txOutContent: string = transaction.txOuts
+    .map((txOut: TxOut) => txOut.address + txOut.amount)
+    .join('')
+
+  return sha256(txInContent + txOutContent).toString()
+}
+```
+
+## 공개 키 암호 방식
+
+키 페어(keypair), 즉 비밀 키(secret key)와 공개 키(public key)를 갖게 됩니다. 공개 키는 비밀 키로부터 유도될 수 있지만, 반대로 비밀 키는 공개 키로부터 유도될 수 없습니다. 공개 키는 이름 그대로 누구나 안전하게 공유할 수 있습니다.
+
+어떤 메시지든 비밀 키를 사용해 서명을 생성할 수 있습니다. 이 서명과 그에 상응하는 공개 키가 있다면, 누구나 이 서명이 해당 공개 키와 일치하는 비밀 키에 의해 생성되었음을 검증할 수 있습니다.
+
+![public-key cryptography](https://www.mtpelerin.com/images/public-private-keys-digital-signature.svg)
+
+트랜잭션 구현을 위해 타원 곡선(elliptic curves)을 사용하는 **elliptic** 라이브러리를 공개 키 암호 방식(ECDSA)에 활용합니다
+
+### 개인 키
+
+유효한 개인 키(Private key)는 임의의 32바이트 문자열입니다.  
+ 예시: `19f128debc1b9122da0635954488b208b829879cf13b3d6cac5d1260c0fd967c`
+
+### 공개 키
+
+유효한 공개 키(Public key)는 `'04'` 뒤에 64바이트 문자열이 붙은 형태입니다.  
+ 예시: `04bfcab8722991ae774db48f934ca79cfb7dd991229153b9f732ba5334aafcd8e7266e47076996b55a14bf9913ee3145ce0cfc1372ada8ada74bd287450313534a`
+
+공개 키는 개인 키로부터 유도될 수 있습니다. 이 공개 키는 트랜잭션에서 코인을 받는 '수신자(receiver)' **주소**로 사용됩니다.
+
+### 서명
+
+TxIn에는 개인키 자체는 포함되지 않고 개인 키로 생성한 서명이 들어갑니다. 트랜잭션이 서명된 후에는 그 내용이 변경될 수 없다는 점이 중요합니다.
+
+![](https://github.com/user-attachments/assets/6b58a6f3-d903-4b01-811f-c6350b4b60c7)
+
+서명할 때는 트랜잭션 id를 서명합니다. 트랜잭션 id는 트랜잭션의 모든 인풋과 아웃풋을 해싱한 값이기 때문에 내용 중 하나라도 수정되면 Id가 변경됩니다. 그러므로 트랜잭션의 내용이 조금이라도 변경이 되면 트랜잭션과 서명이 무효가 됩니다.
+
+```ts
+const signTxIn = (
+  transaction: Transaction,
+  txInIndex: number,
+  privateKey: string,
+  aUnspentTxOuts: UnspentTxOut[],
+): string => {
+  const txIn: TxIn = transaction.txIns[txInIndex]
+
+  const dataToSign = transaction.id
+  const referencedUnspentTxOut = findUnspentTxOut(
+    txIn.txOutId,
+    txIn.txOutIndex,
+    aUnspentTxOuts,
+  )
+  if (!referencedUnspentTxOut) {
+    throw Error('UnspentTxOut not found')
+  }
+
+  const referencedAddress = referencedUnspentTxOut.address
+
+  if (getPublicKey(privateKey) !== referencedAddress) {
+    throw Error()
+  }
+  const key = ec.keyFromPrivate(privateKey, 'hex')
+  const signature: string = byteArrayToHexString(key.sign(dataToSign).toDER())
+
+  return signature
+}
+```
+
+누군가 트랜잭션을 변경하려고 시도할 때 어떤 일이 일어나는지 이해해 봅시다.
+
+1.  공격자가 노드를 운영하며 다음과 같은 트랜잭션 내용을 수신합니다: "주소 AAA에서 BBB로 10코인 전송" (txId: `0x555..`)
+2.  공격자는 수신자 주소를 CCC로 변경하고 이를 네트워크에 전달합니다. 이제 트랜잭션 내용은 "주소 AAA에서 CCC로 10코인 전송"이 됩니다.
+3.  하지만 수신자 주소가 변경되었기 때문에 원래의 `txId`는 더 이상 유효하지 않습니다. 새로운 유효한 `txId`는 `0x567...`이 될 것입니다.
+4.  만약 `txId`가 새로운 값으로 설정되면, 서명이 유효하지 않게 됩니다. 서명은 원래의 `txId`인 `0x555..`와만 일치하기 때문입니다.
+
+결과적으로, 수정된 트랜잭션은 어떤 식으로든 유효하지 않기 때문에 다른 노드들에 의해 수락되지 않습니다.
+
+## uTxO (Unspent Transaction Outputs, uTxO)
+
+트랜잭션 입력(transaction input)은 항상 사용되지 않은 트랜잭션 출력 (uTxO)을 참조해야 합니다. 따라서 블록체인 상에서 코인을 보유하고 있다는 것은, 실제로는 자신이 소유한 개인키와 일치하는 공개키를 가진 **uTxO 목록**을 가지고 있다는 것을 의미합니다.
+
+uTxO의 데이터 구조는 다음과 같습니다.
+
+```ts
+class UnspentTxOut {
+  public readonly txOutId: string
+  public readonly txOutIndex: number
+  public readonly address: string
+  public readonly amount: number
+
+  constructor(
+    txOutId: string,
+    txOutIndex: number,
+    address: string,
+    amount: number,
+  ) {
+    this.txOutId = txOutId
+    this.txOutIndex = txOutIndex
+    this.address = address
+    this.amount = amount
+  }
+}
+```
+
+```typescript
+let unspentTxOuts: UnspentTxOut[] = []
+```
+
+### uTxO 업데이트
+
+새로운 트랜잭션은 기존의 트랜잭션 출력을 일부 소비하고 새로운 미사용 출력을 생성합니다. 그러므로 새로운 블록이 추가될 때마다 uTxO를 업데이트해야 합니다.
+
+```ts
+const updateUnspentTxOuts = (
+  aTransactions: Transaction[],
+  aUnspentTxOuts: UnspentTxOut[],
+): UnspentTxOut[] => {
+  // 새로운 트랜잭션 출력
+  const newUnspentTxOuts: UnspentTxOut[] = aTransactions.flatMap((t) =>
+    t.txOuts.map(
+      (txOut, index) =>
+        new UnspentTxOut(t.id, index, txOut.address, txOut.amount),
+    ),
+  )
+
+  // 새로운 트랜잭션에서 사용된 uTxO
+  const consumedTxOuts: UnspentTxOut[] = aTransactions
+    .flatMap((t) => t.txIns)
+    .map((txIn) => new UnspentTxOut(txIn.txOutId, txIn.txOutIndex, '', 0))
+
+  const resultingUnspentTxOuts = [
+    ...aUnspentTxOuts.filter(
+      (uTxO) =>
+        !findUnspentTxOut(uTxO.txOutId, uTxO.txOutIndex, consumedTxOuts),
+    ),
+    ...newUnspentTxOuts,
+  ]
+
+  return resultingUnspentTxOuts
+}
+```
+
+## Transaction 검증
+
+- 거래 구조 검증
+- 거래 id 검증: 해시하면 id 나오는지 확인
+- 공개키로 서명 검증
+- 사용된 적 없응 아웃풋을 사용하는지 검증
+- 출력값 합계가 입력값 합계와 같은지 검증 (예를 들어, 50 코인이 포함된 출력을 참조했다면, 새로운 출력들의 값의 합계도 50 코인이어야 합니다.)
+
+```ts
+const validateTransaction = (
+  transaction: Transaction,
+  aUnspentTxOuts: UnspentTxOut[],
+): boolean => {
+  // 올바른 구조인지 검증
+  if (!isValidTransactionStructure(transaction)) {
+    return false
+  }
+
+  // 인풋, 아웃풋 해시하면 id 나오는지 확인
+  if (getTransactionId(transaction) !== transaction.id) {
+    console.log('invalid tx id: ' + transaction.id)
+    return false
+  }
+
+  // 공개키로 서명 검증해서 유효한 인풋인지 검사
+  // 사용된 적 없응 아웃풋을 사용하는지 검증
+  const hasValidTxIns: boolean = transaction.txIns.every((txIn) =>
+    validateTxIn(txIn, transaction, aUnspentTxOuts),
+  )
+
+  if (!hasValidTxIns) {
+    console.log('some of the txIns are invalid in tx: ' + transaction.id)
+    return false
+  }
+
+  // 인풋 총 코인
+  const totalTxInValues: number = transaction.txIns
+    .map((txIn) => getTxInAmount(txIn, aUnspentTxOuts))
+    .reduce((a, b) => a + b, 0)
+  // 아웃풋 총 코인
+  const totalTxOutValues: number = transaction.txOuts
+    .map((txOut) => txOut.amount)
+    .reduce((a, b) => a + b, 0)
+
+  // 인풋 총 코인과 아웃 풋 코인이 일치하는지 검증
+  if (totalTxOutValues !== totalTxInValues) {
+    console.log('totalTxOutValues !== totalTxInValues in tx: ' + transaction.id)
+    return false
+  }
+
+  return true
+}
+```
+
+## 코인베이스
+
+모든 거래의 입력(inputs)은 반드시 사용되지 않은 거래의 출력(unspent transaction outputs)을 참조해야 합니다. 그렇다면 최초의 코인들은 블록체인에 어떻게 들어올까요? 이 문제를 해결하기 위해 코인베이스 거래(coinbase transaction)라는 특별한 유형의 거래가 도입되었습니다.
+
+항상 블록에서 가장 첫 번째 거래이며, 입력 없이 출력(output)만으로 구성됩니다. 이는 코인베이스 거래가 새로운 코인을 유통시키는 역할을 한다는 의미입니다. 코인베이스 거래는 해당 블록을 채굴한 채굴자에게 코인을 보냅니다. 코인베이스 보상은 채굴자에게 동기를 부여하는 역할을 합니다.
+
+simple-coin 코인베이스 출력의 양을 50코인입니다.
+
+`const COINBASE_AMOUNT: number = 50;`
+
+코인베이스 거래가 고유한 거래 ID(txId)를 갖도록 하기 위해, 블록 높이(block height)를 코인베이스 거래의 입력에 추가합니다. 이 규칙이 없다면, 예를 들어 "0xabc 주소에 50코인을 지급"하는 코인베이스 거래는 항상 같은 거래 ID를 갖게 됩니다.
+
+### 코인베이스 검증
+
+코인베이스 거래의 유효성 검증은 '일반적인' 거래의 유효성 검증과는 약간 다릅니다.
+
+- transaction이 존재하는지 (null인지 확인)
+- transaction.id가 실제 계산된 ID(getTransactionId(transaction))와 일치하는지
+- 인풋이 하나인지
+- 인풋에 blockIndex(블록 높이)가 있는지
+- 아웃풋이 하나인지
+- 보상이 COINBASE_AMOUNT와 같은지
+
+```ts
+const validateCoinbaseTx = (
+  transaction: Transaction,
+  blockIndex: number,
+): boolean => {
+  if (transaction == null) {
+    console.log(
+      'the first transaction in the block must be coinbase transaction',
+    )
+    return false
+  }
+  if (getTransactionId(transaction) !== transaction.id) {
+    console.log('invalid coinbase tx id: ' + transaction.id)
+    return false
+  }
+  if (transaction.txIns.length !== 1) {
+    console.log('one txIn must be specified in the coinbase transaction')
+    return false
+  }
+  if (transaction.txIns[0].txOutIndex !== blockIndex) {
+    console.log('the txIn signature in coinbase tx must be the block height')
+    return false
+  }
+  if (transaction.txOuts.length !== 1) {
+    console.log('invalid number of txOuts in coinbase transaction')
+    return false
+  }
+  if (transaction.txOuts[0].amount != COINBASE_AMOUNT) {
+    console.log('invalid coinbase amount in coinbase transaction')
+    return false
+  }
+  return true
+}
+```
+
+## 다음 섹션
+
+블록체인에 transaction을 추가했습니다. 기본적인 아이디어는 매우 간단했습니다. 거래 입력(transaction inputs)에서 사용되지 않은 출력(unspent outputs)을 참조하고, 서명을 사용해 잠금 해제합니다. 그런 다음, 출력(outputs)을 사용해 수신자 주소로 다시 잠급니다.
+
+하지만, 지금 상태에서 거래를 만드는 것은 여전히 매우 어렵습니다. 거래의 입력과 출력을 수동으로 생성하고, 개인 키를 사용해 서명해야 하기 때문입니다. 다음 챕터에서 지갑(wallets)을 만들어 해결해 보겠습니다. 또한, 거래를 블록체인에 포함시키려면 직접 채굴해야만 합니다. 채굴 없이 거래를 하기 위해서는 mempool 기능도 필요합니다.
