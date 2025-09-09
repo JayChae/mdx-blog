@@ -12,7 +12,6 @@ import {
 import { usePathname } from 'next/navigation'
 
 import { cn } from '#/lib/utils'
-import { getHasMouse } from '#/utils/get-device-type'
 
 interface SidebarContextType {
   open: boolean
@@ -43,7 +42,10 @@ export const useSidebar = () => {
 export function SidebarProvider({ children }: ChildrenProp) {
   const [open, setOpen] = useState(false)
   const [pinned, setPinned] = useState(false)
-  const hasMouse = getHasMouse()
+  const [hasMouse, setHasMouse] = useState(true)
+  useEffect(() => {
+    setHasMouse(window.matchMedia('(pointer: fine)').matches)
+  }, [])
 
   const value: SidebarContextType = {
     open,

@@ -13,21 +13,63 @@ export default function SimpleCoinPage() {
 
       <div className="prose prose-lg max-w-none">
         <p className="mb-8 text-xl text-gray-700">
-          블록체인과 암호화폐의 기본 개념을 이해하기 위해 직접 간단한 암호화폐를
-          구현해보는 실습입니다.
+          블록체인과 암호화폐의 기본 원리를 이해하기 위한 간단한 암호화폐 구현
         </p>
 
         <div className="mb-8 grid gap-8 md:grid-cols-2">
           <div className="rounded-lg border border-green-200 bg-green-50 p-6">
             <h2 className="mb-4 text-2xl font-semibold text-green-800">
-              📋 학습 목표
+              📋 목차
             </h2>
             <ul className="space-y-2 text-gray-700">
-              <li>• 블록체인의 기본 구조 이해</li>
-              <li>• 해시 함수의 역할 학습</li>
-              <li>• Proof-of-Work 개념 실습</li>
-              <li>• 트랜잭션 검증 메커니즘</li>
-              <li>• 블록 연결 및 체인 생성</li>
+              <li>
+                <Link
+                  href="/simple-coin/blockchain"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 블록체인 구현
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/simple-coin/pow"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 Proof-of-Work 구현
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/simple-coin/transaction"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 트랜잭션 구현
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/simple-coin/wallet"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 지갑 구현
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/simple-coin/mempool"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 mempool 구현
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/simple-coin/spa"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  간단한 SPA 웹페이지 구현
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -36,10 +78,11 @@ export default function SimpleCoinPage() {
               🛠️ 기술 스택
             </h2>
             <ul className="space-y-2 text-gray-700">
-              <li>• TypeScript/Node.js</li>
-              <li>• Crypto 모듈 (해시 함수)</li>
-              <li>• 간단한 HTTP 서버</li>
-              <li>• JSON 데이터 구조</li>
+              <li>• TypeScript</li>
+              <li>• Node.js</li>
+              <li>• Express</li>
+              <li>• WebSocket: ws</li>
+              <li>• Crypto: crypto-js & elliptic</li>
             </ul>
           </div>
         </div>
