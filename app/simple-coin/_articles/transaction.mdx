@@ -88,7 +88,13 @@ const getTransactionId = (transaction: Transaction): string => {
 
 ![public-key cryptography](https://www.mtpelerin.com/images/public-private-keys-digital-signature.svg)
 
-트랜잭션 구현을 위해 타원 곡선(elliptic curves)을 사용하는 **elliptic** 라이브러리를 공개 키 암호 방식(ECDSA)에 활용합니다
+트랜잭션 구현을 위해 타원 곡선(elliptic curves)을 사용하는 **elliptic** 라이브러리를 공개 키 암호 방식(ECDSA)에 활용합니다.
+
+```ts
+import elliptic from 'elliptic'
+
+const ec = new elliptic.ec('secp256k1')
+```
 
 ### 개인 키
 

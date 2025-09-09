@@ -1,65 +1,207 @@
-# 간단한 지갑 구현
+# Simple Wallet
 
-지갑은 암호화폐를 저장하고 전송할 수 있는 소프트웨어입니다.
+지갑은 사용자를 위해 추상적인 인터페이스를 제공해야 합니다. 사용자는 다음 작업을 수행할 수 있어야 합니다.
 
-## 지갑의 역할
+- 새로운 지갑 생성(=이 경우, 개인 키)
+- 지갑 잔액 조회
+- 다른 주소로 코인 전송
 
-암호화폐 지갑은 다음 기능들을 제공합니다:
+지갑이 있으면 사용자는 트랜잭션 입력, 출력의 작동 방식을 이해하지 않아도 다른 주소로 코인을 보내고, 다른 사람들의 코인을 받을 수 있습니다.
 
-- **개인키/공개키 관리**: 암호화폐 소유권 증명
-- **주소 생성**: 거래를 위한 고유 식별자
-- **트랜잭션 생성**: 암호화폐 전송
-- **잔액 조회**: 보유 암호화폐 현황
+## 개인 키 생성 및 저장
 
-## 타원 곡선 암호화
+simple-coin에서는 가장 간단한 방법으로 지갑을 생성하고 관리합니다. 암호화되지 않은 개인 키를 node/wallet/private_key 파일에 생성합니다.
 
-Bitcoin과 같은 암호화폐에서 사용하는 ECC (Elliptic Curve Cryptography):
+```typescript
+const ec = new elliptic.ec('secp256k1')
 
-```javascript
-const EC = require('elliptic').ec
-const ec = new EC('secp256k1')
+const privateKeyLocation = 'node/wallet/private_key'
 
-class Wallet {
-  constructor() {
-    this.keyPair = ec.genKeyPair()
-    this.publicKey = this.keyPair.getPublic('hex')
-    this.privateKey = this.keyPair.getPrivate('hex')
+const generatePrivateKey = (): string => {
+  const keyPair = ec.genKeyPair()
+  const privateKey = keyPair.getPrivate()
+  return privateKey.toString(16)
+}
+
+const initWallet = () => {
+  if (existsSync(privateKeyLocation)) {
+    return
+  }
+
+  const dir = dirname(privateKeyLocation)
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true })
+  }
+
+  const newPrivateKey = generatePrivateKey()
+  writeFileSync(privateKeyLocation, newPrivateKey)
+}
+```
+
+앞서 언급했듯이, 공개 키(=주소)는 개인 키로부터 계산될 수 있습니다.
+
+```typescript
+const getPublicFromWallet = (): string => {
+  const privateKey = getPrivateFromWallet()
+  const key = ec.keyFromPrivate(privateKey, 'hex')
+  return key.getPublic().encode('hex', false)
+}
+```
+
+개인 키를 암호화되지 않은 형식으로 저장하는 것은 매우 위험합니다. simple-coin에서는 최대한 단순하게 유지하기 위해 이 방법을 사용했습니다. 또한, 이 지갑은 단 하나의 개인 키만 지원합니다. 새로운 공개 주소를 얻으려면 새 지갑을 생성해야 합니다.
+
+## 잔액 확인
+
+블록체인에서 코인을 소유한다는 것은 본인이 소유한 공개 키를 가지고 있는 사용되지 않은 트랜잭션 출력(uTxO) 목록을 가지고 있다는 것을 의미합니다. 즉 잔고를 확인하기 위해서는 해당 공개 키(주소)를 가진 모든 사용되지 않은 트랜잭션 아웃풋을 합산하기만 하면 됩니다.
+
+```typescript
+const getBalance = (address: string, unspentTxOuts: UnspentTxOut[]): number => {
+  return unspentTxOuts
+    .filter((uTxO) => uTxO.address === address)
+    .reduce((sum, uTxO) => sum + uTxO.amount, 0)
+}
+```
+
+코드에서 볼 수 있듯이, 주소의 잔액을 조회하는 데 개인 키는 필요하지 않습니다. 따라서 누구나 특정 주소의 잔액을 확인할 수 있습니다.
+
+## 코인 전송
+
+코인을 전송할 때, 사용자는 트랜잭션 입력 및 출력의 개념을 알지 못합니다. 종민이가 상규에게 20코인을 보내고 싶은 상황이라고 해봅시다. 종민이가 30코인의 잔액을 가지고 있지만 이것이 단 하나의 출력(uTxO)일 경우 어떻게 할까요?
+
+하나의 트랜잭션 출력은 항상 전부 소비되어야 하기 때문에 상규의 주소로 20 비트코인을 보내고, 10 코인은 다시 사용자 종민에게 돌려보내는 트랜잭션을 만들어야 합니다.
+
+![](https://github.com/user-attachments/assets/0c670e58-d279-4307-9d4b-3af44d0549da)
+
+조금 더 복잡한 트랜잭션 시나리오를 살펴봅시다:
+
+- 종민이는 처음에 0코인을 가지고 있습니다.
+- 종민이가 각각 20코인, 25코인짜리 트랜잭션 2개를 받습니다.
+- 종민이는 상규에게 40코인을 보내고 싶어 합니다.
+
+이 경우, 20코인, 25코인 출력을 모두를 사용해야 하며, 새로운 트랜잭션의 출력은 상규에게 40코인, 그리고 종민에게 다시 5코인을 보냅니다.
+
+![](https://github.com/user-attachments/assets/c4684a48-143c-47c8-98d6-a7ef5397e877)
+
+## 구현
+
+### 포함해야 하는 아웃풋과 남는 금액을 계산
+
+`leftOverAmount`는 다시 돌려보낼 금액을 의미합니다.
+
+```ts
+const findTxOutsForAmount = (
+  amount: number,
+  myUnspentTxOuts: UnspentTxOut[],
+) => {
+  let currentAmount = 0
+  const includedUnspentTxOuts: UnspentTxOut[] = []
+  for (const myUnspentTxOut of myUnspentTxOuts) {
+    includedUnspentTxOuts.push(myUnspentTxOut)
+    currentAmount = currentAmount + myUnspentTxOut.amount
+    if (currentAmount >= amount) {
+      const leftOverAmount = currentAmount - amount
+
+      return { includedUnspentTxOuts, leftOverAmount }
+    }
+  }
+  const errorMessage =
+    'Cannot create transaction from the available unspent transaction outputs.' +
+    ' Required amount:' +
+    amount +
+    '. Available unspentTxOuts:' +
+    JSON.stringify(myUnspentTxOuts)
+  throw Error(errorMessage)
+}
+```
+
+### 아웃풋 목록 생성
+
+다음으로, 트랜잭션의 두 개 출력을 생성합니다:
+
+- 하나는 코인을 받는 사람(receiver)을 위한 출력
+- 다른 하나는 **leftOverAmount**(거스름돈)을 위한 출력
+
+만약 txIns가 정확히 원하는 금액만큼의 값을 가진다면(`leftOverAmount === 0`), “거스름돈” 트랜잭션은 생성하지 않습니다.
+
+```ts
+const createTxOuts = (
+  receiverAddress: string,
+  myAddress: string,
+  amount: number,
+  leftOverAmount: number,
+) => {
+  const txOut1 = new TxOut(receiverAddress, amount)
+  if (leftOverAmount === 0) {
+    return [txOut1]
+  } else {
+    const leftOverTx = new TxOut(myAddress, leftOverAmount)
+    return [txOut1, leftOverTx]
   }
 }
 ```
 
-## 주소 생성
+### 인풋 목록 생성
 
-공개키로부터 지갑 주소를 생성하는 과정:
+미사용 트랜잭션 출력(UTXO) 목록을 가지고 있으므로, 이를 이용해 트랜잭션의 txIns를 생성합니다.
 
-1. **SHA-256 해싱**: 공개키를 SHA-256으로 해싱
-2. **RIPEMD-160 해싱**: SHA-256 결과를 RIPEMD-160으로 해싱
-3. **체크섬 추가**: 버전 바이트와 체크섬 추가
-4. **Base58 인코딩**: 사람이 읽기 쉬운 형식으로 변환
+```ts
+const { includedUnspentTxOuts, leftOverAmount } = findTxOutsForAmount(
+  amount,
+  myUnspentTxOuts,
+)
 
-## 개인키 관리
+const toUnsignedTxIn = (unspentTxOut: UnspentTxOut) => {
+  const txIn = new TxIn(unspentTxOut.txOutId, unspentTxOut.txOutIndex, '')
+  return txIn
+}
 
-지갑의 가장 중요한 요소인 개인키 관리:
+const unsignedTxIns: TxIn[] = includedUnspentTxOuts.map(toUnsignedTxIn)
+```
 
-- **안전한 저장**: 암호화된 형태로 저장
-- **백업**: 복구를 위한 시드 구문 사용
-- **보안**: 하드웨어 지갑이나 멀티시그 사용
-- **복구**: 시드 구문으로 지갑 복원
+### 트랜잭션 ID를 계산하고 txIns에 서명
 
-## 지갑 유형
+```ts
+const unsignedTxIns: TxIn[] = includedUnspentTxOuts.map(toUnsignedTxIn)
 
-### 1. 소프트웨어 지갑
+const tx = new Transaction(
+  '',
+  unsignedTxIns,
+  createTxOuts(receiverAddress, myAddress, amount, leftOverAmount),
+)
+tx.id = getTransactionId(tx)
 
-- **데스크톱 지갑**: 컴퓨터에 설치
-- **모바일 지갑**: 스마트폰 앱
-- **웹 지갑**: 브라우저 기반
+tx.txIns = tx.txIns.map((txIn: TxIn, index: number) => {
+  txIn.signature = signTxIn(tx, index, privateKey, unspentTxOuts)
+  return txIn
+})
+```
 
-### 2. 하드웨어 지갑
+## 지갑 사용을 위한 HTTP
 
-- **콜드 스토리지**: 인터넷과 분리된 저장
-- **보안 칩**: 개인키를 안전하게 보호
+사용자가 주소와 금액만 전달하면 트랜잭션을 생성하고 블록에 담아 체인에 추가합니다. 추가되면 네트워크로 전파합니다.
 
-### 3. 종이 지갑
+```ts
+app.post('/mineTransaction', (req, res) => {
+  const address = req.body.address
+  const amount = req.body.amount
+  try {
+    const newBlock = generateBlockWithTransaction(address, amount)
+    if (newBlock === null) {
+      res.status(400).send('could not generate block')
+    } else {
+      broadcastLatest()
+      res.send(newBlock)
+    }
+  } catch (e) {
+    if (e instanceof Error) {
+      res.status(400).send(e.message)
+    } else {
+      res.status(400).send('unknown error')
+    }
+  }
+})
+```
 
-- **프라이빗 키 출력**: 종이에 개인키 인쇄
-- **오프라인 저장**: 인터넷 연결 불필요
+## 다음 챕터
+
+지금까지는 거래를 블록체인에 올리기 위해서 무조건 블록을 채굴해야 합니다. 하지만 채굴자가 아닌 사람도 거래를 할 수 있어야 합니다. 이를 위해 mempool를 구현해야 합니다.
