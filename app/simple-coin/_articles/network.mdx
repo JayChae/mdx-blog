@@ -1,42 +1,146 @@
-# 간단한 블록체인 네트워크 구현
+# Simple Blockchain NetWork
 
-블록체인 네트워크는 노드들이 서로 연결되어 데이터를 공유하는 분산 시스템입니다.
+다른 노드와 블록을 공유하고 동기화하기 위해 다음과 같은 규칙이 적용합니다.
 
-## P2P 네트워크 기본 개념
+노드가 새 블록을 생성하면 네트워크에 이를 전파합니다.
 
-블록체인 네트워크의 핵심은 노드 간의 직접적인 통신입니다. 각 노드는 네트워크의 일부로서:
+![](https://github.com/user-attachments/assets/01b1cf11-36f4-4000-b772-ddd9807386d5)
 
-- 트랜잭션을 생성하고 전파
-- 블록을 검증하고 전파
-- 네트워크의 합의에 참여
+새로운 노드에 연결하면 최신 블록을 요청합니다. 노드가 현재 알려진 블록보다 인덱스가 큰 블록을 발견하면, 바로 다음 블록으로 추가할 수 있는 경우에는 블록을 추가하고, 바로 추가 할 수 없는 경우 전체 블록체인을 요청합니다.
 
-## WebSocket을 활용한 구현
+![](https://github.com/user-attachments/assets/3e2e70f1-01d9-47c3-94e8-66d7590e9e7a)
 
-```javascript
-const WebSocket = require('ws')
-const wss = new WebSocket.Server({ port: 8080 })
+## P2P
 
-wss.on('connection', (ws) => {
-  console.log('새로운 노드가 연결되었습니다')
+P2P 통신을 위해 웹소켓(ws)을 사용합니다.
 
-  ws.on('message', (message) => {
-    const data = JSON.parse(message)
-    // 메시지 처리 로직
-  })
-})
+```ts
+const sockets: WebSocket[]
 ```
 
-## 네트워크 토폴로지
+각 노드의 활성 소켓은 변수에 저장합니다.
+자동 피어 탐색 기능은 사용하지 않으며, 피어의 위치(웹소켓 URL)는 수동으로 추가해야 합니다.
 
-- **스타 토폴로지**: 중앙 허브를 통한 연결
-- **메시 토폴로지**: 모든 노드가 서로 직접 연결
-- **하이브리드**: 효율성과 안정성의 균형
+```ts
+const initP2PServer = () => {
+  const server = new WebSocket.Server({ port: P2P_PORT })
 
-## 보안 고려사항
+  // 다른 노드가 연결해 온 경우
+  server.on('connection', (ws: WebSocket) => {
+    console.log('connected', ws)
+    // 연결된  노드에 추가
+    this.sockets.push(ws)
+    // 에러 및 메시지 받았을 경우 handler
+    this.initMessageHandler(ws)
+    this.initErrorHandler(ws)
+    // 연결된 노드에게 최신 블록 정보 요청
+    this.write(ws, this.queryChainLengthMsg())
+  })
+  console.log('listening websocket p2p port on: ' + P2P_PORT)
+}
+```
 
-네트워크 통신 시 고려해야 할 보안 요소들:
+### HTTP
 
-- 메시지 암호화
-- 노드 인증
-- DDoS 공격 방어
-- 메시지 무결성 검증
+사용자가 노드를 제어할 수 있도록 이를 HTTP 서버를 설정합니다.
+
+```ts
+const initHttpServer = (myHttpPort: number) => {
+  const app = express()
+  app.use(express.json())
+
+  app.get('/blocks', (req, res) => {
+    res.send(getBlockchain())
+  })
+  app.post('/mineBlock', (req, res) => {
+    const newBlock: Block = generateNextBlock(req.body.data)
+    broadcastLatest()
+    res.send(newBlock)
+  })
+  app.get('/peers', (req, res) => {
+    res.send(
+      getSockets().map(
+        (s: any) => s._socket.remoteAddress + ':' + s._socket.remotePort,
+      ),
+    )
+  })
+  app.post('/addPeer', (req, res) => {
+    connectToPeer(req.body.peer)
+    res.send()
+  })
+
+  app.listen(myHttpPort, () => {
+    console.log('Listening http on port: ' + myHttpPort)
+  })
+}
+```
+
+- 모든 블록 목록 보기: 현재 체인에 포함된 모든 블록을 조회할 수 있습니다.
+- 새 블록 생성: 사용자가 제공한 내용으로 새로운 블록을 생성하여 체인에 추가할 수 있습니다.
+- 피어 목록 보기 또는 추가: 현재 연결된 피어 목록을 확인하거나 새로운 피어를 추가할 수 있습니다.
+
+## 구조
+
+![network](https://github.com/user-attachments/assets/02a58422-76b7-4fe1-92dc-4b438e4c54ad)
+
+## 블록체인 Flow
+
+### 1. 블록 생성 및 전파 FLOW
+
+#### 1.1 node1과 node2 연결된 상황
+
+![1](https://github.com/user-attachments/assets/811e6328-4985-4213-878a-24b362a5c340)
+
+#### 1.2 node1에서 블록 생성 후 전파
+
+![1](https://github.com/user-attachments/assets/890ae51f-ee3c-404d-b6bf-b2a37ebbe9cf)
+
+#### 1.3 node2에서 블록 받은 후 체인에 추가
+
+![1](https://github.com/user-attachments/assets/972f5591-a706-4b62-8037-70fe151e0138)
+
+### 2. 새로운 노드 연결 FLOW
+
+#### 2.1 node3 node2 연결하고 최신 블록 요청
+
+![1](https://github.com/user-attachments/assets/5fddbef4-ed75-41dc-973f-39b3c283e737)
+
+#### 2.2 받은 블록의 index가 클 경우 전체 체인 요청
+
+![1](https://github.com/user-attachments/assets/fed612ed-6824-43ab-b8eb-2bb21b11c12b)
+
+#### 2.3 받은 블록체인이 자신보다 길고 유효한지 검사 후 체인 교체
+
+![1](https://github.com/user-attachments/assets/b3c8647c-5a34-4a89-a3d6-27de7a5b1b15)
+
+### 3. 충돌 상황(Fork)
+
+#### 3.1 같은 index의 블록이 동시에 생성된 상황
+
+![1](https://github.com/user-attachments/assets/d3e93958-8e23-46e1-bb9d-823a2070613a)
+
+#### 3.2 node1의 index4 블록을 받은 node2는 아무것도 하지 않는다.
+
+![1](https://github.com/user-attachments/assets/e83f7d64-2567-46f0-b81b-776c59ac91bc)
+
+#### 3.3 node3이 새로운 블록을 생성하여 node2가 받고 node1에게 전달, node1은 바로 체인에 추가할 수 있는 블록이 아니기 때문에 전체 체인 요청
+
+![1](https://github.com/user-attachments/assets/2f558110-20e9-4a9b-b303-daf7ee0eaaca)
+
+#### 3.4 node1은 node2에게 전체 체인 요청을 받고 더 긴 체인을 선택
+
+![1](https://github.com/user-attachments/assets/588c5957-b315-4cf7-a9bf-811a1aef1e64)
+
+node1이 생성한 블록 4는 소실된다. 이러한 블록을 고아 블록이라고 한다. 비트코인의 경우 고아 블록 안에 들어 있던 트랜잭션은 다시 미확인 거래 풀(memPool)로 돌아가 이후에 처리 된다. 해당 기능은 구현하지 않습니다.
+
+### 3.5 결과
+
+![1](https://github.com/user-attachments/assets/b3daad70-9a48-409d-a1eb-bcc2243438eb)
+
+## Simple BlockChain
+
+여기까지가 간단한 블록체인 구현입니다. 블록체인만 구현한 프로젝트인 [simple-blockchain](https://github.com/JayChae/simple-blockchain)도 있으니 확인해 보세요
+
+## 다음 챕터
+
+다음 챕터에서는 채굴과 Proof of Work에 대해서 알아보고 구현합니다.
