@@ -1,146 +1,223 @@
-# 간단한 블록체인 구현
+# Simple Blockchain
 
-블록체인은 연결된 블록들의 체인입니다. 각 블록은 데이터를 포함하며, 이전 블록의 해시값으로 연결됩니다.
+## 블록체인이란?
 
-## 블록체인의 기본 구조
+블록체인이라고 하면 첨단 기술 같지만 그 개념은 간단합니다.
+한 줄 로 정리하자면
 
-블록체인은 다음과 같은 핵심 요소들로 구성됩니다:
+```
+해시값으로 연결된 블록을 쌓아가는 분산형 데이터베이스.
+```
 
-- **블록**: 데이터를 담는 기본 단위
-- **체인**: 블록들이 연결된 구조
-- **해시**: 블록의 무결성을 보장하는 암호화 함수
-- **합의 알고리즘**: 네트워크 참여자들의 합의 메커니즘
+블록체인을 이해하기 위해서는 블록, 해시값, 체인, 분산형 데이터베이스가 무엇인지 알아야 합니다.
 
-## Block 클래스 구현
+### 블록
 
-```javascript
+여러 거래(또는 기록)를 일정한 단위로 묶어 놓은 데이터 집합입니다.
+블록체인의 블록에는 자신의 해시값과 이전 블록의 해시값을 데이터로 가지고 있습니다.
+
+```ts
 class Block {
-  constructor(index, timestamp, data, previousHash = '') {
+  public index: number // 인덱스
+  public previousHash: string // 이전 블록의 해시 값
+  public timestamp: number // 생성 시간
+  public data: Transaction[] // 담고 싶은 데이터 (거래 내역)
+  public hash: string // 해당 블록의 해시값
+
+  constructor(
+    index: number,
+    previousHash: string,
+    timestamp: number,
+    data: Transaction[],
+    difficulty: number,
+    nonce: number,
+    hash: string,
+  ) {
     this.index = index
+    this.previousHash = previousHash
     this.timestamp = timestamp
     this.data = data
-    this.previousHash = previousHash
-    this.hash = this.calculateHash()
-    this.nonce = 0
-  }
-
-  calculateHash() {
-    return crypto
-      .createHash('sha256')
-      .update(
-        this.index +
-          this.previousHash +
-          this.timestamp +
-          JSON.stringify(this.data) +
-          this.nonce,
-      )
-      .digest('hex')
+    this.hash = hash
   }
 }
 ```
 
-## Blockchain 클래스 구현
+블록체인에 첫번째로 생성된 블록은 이전 블록이 없겠죠? 그런 블록은 이전 블록의 해시값을 가지고 있지 않습니다. 이런 특별한 블록을 **제네시스 블록**이라고 합니다. 이는 하드 코딩으로 생성해야 합니다.
 
-블록들을 관리하는 블록체인 클래스:
+```ts
+const genesisBlock: Block = new Block(
+  0,
+  '',
+  1756716811,
+  'Let there be a block',
+  '38cdd2a4bdf21856e32e440da4ade0441e5b327f87981fe18dc63c4e1f0a2db6',
+)
+```
+
+### 해시
+
+데이터를 일정한 길이의 고정된 문자열로 변환하는 암호학적 함수입니다. 해시 함수의 핵심은 4가지 입니다.
+
+#### 1. 일가성 함수
+
+해시 함수도 함수입니다. 입력값이 같으면 항상 동일한 출력값을 냅니다.
+
+#### 2. 고정된 길이 출력
+
+해시 함수에는 어떤 데이터든지 들어갈 수 있습니다. 그러나 입력값에 상관없이 언제나 똑같은 길이의 값을 출력합니다.
+simple coin은 비트코인과 같이 SHA256 해시 함수를 사용합니다. 작은 데이터를 넣든, 큰 데이터를 넣든 언제느 16진수(HEX)의 64글자가 결괏값으로 나옵니다.
+해시 함수는 고정된 길이를 출력하기 때문에 해싱을 입력값을 압축한 것으로 받아들여도 좋습니다. 즉 대표값으로 여길 수 있다는 말입니다. 이 떄문에 해싱해서 나온 출력값을 메시지 다이제스트(Message Digest) 또는 지문(fingerprint)라고도 합니다.
+
+#### 3. 눈사태 효과
+
+눈사태 효과란 입력값이 아주 조금만 바꿔도 완전히 다른 결괏값이 나오는 것을 의미합니다.
+입력값이 비슷해도 출력값에서는 유사성을 전혀 찾아볼 수 없습니다.
+
+#### 4. 단방향성
+
+해시 함수의 가장 중요한 특징입니다. 출력값을 보고 입력값을 알아낼 수 없습니다. 이 특징 때문에 해시 함수는 보안 분야에서 많이 사용됩니다.
+
+### 체인
+
+블록의 모든 데이터를 해싱한 값을 블록의 해시값으로 사용하고 대표값으로 활용합니다.
+각 블록은 이전 블록의 해시값을 포함하고 있기 때문에, 마치 **체인**처럼 끊어지지 않고 연결됩니다.
+
+![블록](https://github.com/user-attachments/assets/e9af0399-2883-4af5-98e6-a65939187d53)
+
+```ts
+// index, previousHash, timestamp, data를 해싱
+calculateHash(
+    index: number,
+    previousHash: string,
+    timestamp: number,
+    data: string
+): string => {
+    return CryptoJS.SHA256(index + previousHash + timestamp + data).toString();
+}
+
+
+const generateBlock = (blockData: string) => {
+  const previousBlock: Block = getLatestBlock(); // 마지막 블록
+  const nextIndex: number = previousBlock.index + 1;
+  const nextTimestamp: number = new Date().getTime() / 1000;
+  const nextHash: string = calculateHash(
+    nextIndex,
+    previousBlock.hash,
+    nextTimestamp,
+    blockData
+  );
+  const newBlock: Block = new Block(
+    nextIndex,
+    previousBlock.hash,
+    nextTimestamp,
+    blockData,
+    nextHash
+  );
+  return newBlock;
+};
+
+```
+
+블록의 해시값에는 "이전 블록의 해시값"이 들어가기 때문에 두 블록은 완전히 연결됩니다. 해당 해시값이 나오기 위해서는 이전 블록의 데이터를 품고 있을 수 밖에 없습니다. 여기서 선후관계가 만들어지고, 각 블록의 연결 고리가 만들어집니다.
+
+![체인](https://github.com/user-attachments/assets/27be6839-a5ae-4856-8f45-f6fb763b3592)
+
+비트코인을 만든 사토시 나카모토가 이 개념을 처음 백서에서 소개할 때는 블록체인이라는 말을 쓰지 않았지만 블록들이 체인처럼 연결되어 있기 때문에 이 말이 대중화가 되었다고 합니다.
+
+### 분산형 데이터베이스
+
+물리적으로는 여러 위치에 분산되어 있지만, 논리적으로는 하나의 통합된 데이터베이스 시스템처럼 동작하는 데이터베이스를 말합니다. 여러 대의 컴퓨터(노드 또는 인스턴스)가 네트워크를 통해 연결되어 있고, 각각의 컴퓨터가 모두 데이터를 저장하고 처리합니다. 서버를 두고 한 곳에서만 처리하지 않기 때문에 한 곳에서 문제가 생겨도 시스템 전체가 멈추지 않고 계속 돌아갑니다.
+즉, 해시로 연결되어 있는 블록 데이터들을 한 곳에 저장한 것이 아니라 여러 컴퓨터가 모두 가지고 있고 네트워크를 통해 서로 계속해서 통신하며 업데이트를 할 때, 블록체인이 완성됩니다.
+
+![블록체인](https://github.com/user-attachments/assets/941afa2b-fc63-4c3a-912f-a897cd0ee0e9)
+
+## 구현
+
+### 블록체인 저장 및 무결성 검증
+
+simple coin은 인메모리 자바스크립트 배열을 사용하여 블록체인을 저장합니다. 노드가 종료되면 데이터가 영구적으로 저장되지 않습니다.
 
 ```javascript
-class Blockchain {
-  constructor() {
-    this.chain = [this.createGenesisBlock()]
-    this.difficulty = 4
+const blockchain: Block[] = [genesisBlock];
+```
+
+### 무결성 검증
+
+언제든지 블록 또는 블록 체인의 **무결성을 검증**할 수 있어야 합니다.
+특히 다른 노드로부터 새로운 블록을 수신했을 때 이를 수락할지 여부를 결정해야 하기 때문에 매우 중요합니다.
+
+### 블록 검증
+
+블록이 유효하려면 다음 조건이 충족되어야 합니다.
+
+- 블록의 **인덱스**는 이전 블록의 인덱스보다 1이 커야 합니다.
+- 블록의 `previousHash`는 이전 블록의 `hash`와 일치해야 합니다.
+- 블록 자체의 `hash`가 유효해야 합니다.
+
+```ts
+const isValidBlock = (newBlock: Block, previousBlock: Block): boolean => {
+  if (!isValidBlockStructure(newBlock)) {
+    console.log('invalid structure')
+    return false
   }
 
-  createGenesisBlock() {
-    return new Block(0, Date.now(), 'Genesis Block', '0')
+  if (previousBlock.index + 1 !== newBlock.index) {
+    console.log('invalid index')
+    return false
   }
 
-  getLatestBlock() {
-    return this.chain[this.chain.length - 1]
+  if (previousBlock.hash !== newBlock.previousHash) {
+    console.log('invalid previousHash')
+    return false
   }
 
-  addBlock(newBlock) {
-    newBlock.previousHash = this.getLatestBlock().hash
-    newBlock.mineBlock(this.difficulty)
-    this.chain.push(newBlock)
+  if (calculateHashForBlock(newBlock) !== newBlock.hash) {
+    console.log('invalid hash')
+    return false
   }
-
-  isChainValid() {
-    for (let i = 1; i < this.chain.length; i++) {
-      const currentBlock = this.chain[i]
-      const previousBlock = this.chain[i - 1]
-
-      if (currentBlock.hash !== currentBlock.calculateHash()) {
-        return false
-      }
-
-      if (currentBlock.previousHash !== previousBlock.hash) {
-        return false
-      }
-    }
-    return true
-  }
+  return true
 }
 ```
 
-## 해시 함수의 역할
+### 블록체인 검증
 
-SHA-256 해시 함수는 블록체인에서 다음과 같은 역할을 합니다:
+제네시스 블록부터 시작하여 모든 블록이 순차적으로 유효한지 검사합니다.
 
-### 1. 무결성 보장
+```ts
+const isValidChain = (blockchainToValidate: Block[]): boolean => {
+  if (!isValidGenesis(blockchainToValidate[0])) {
+    return false
+  }
 
-- 블록 데이터가 변경되면 해시값이 완전히 바뀜
-- 데이터 변조를 즉시 감지 가능
+  for (let i = 1; i < blockchainToValidate.length; i++) {
+    if (
+      !isValidNewBlock(blockchainToValidate[i], blockchainToValidate[i - 1])
+    ) {
+      return false
+    }
+  }
+  return true
+}
+```
 
-### 2. 연결성 유지
+### 충돌 상황(Fork)
 
-- 각 블록이 이전 블록의 해시를 포함
-- 블록 간의 강력한 연결 고리 형성
+충돌이 발생하는 경우(예: 두 노드가 동시에 블록 번호 72를 생성하는 경우) 블록 수가 가장 긴 체인을 선택합니다.
 
-### 3. 작업 증명
+![fork](https://github.com/user-attachments/assets/10d8c392-2077-462c-b6c6-f389941e6f84)
 
-- Proof-of-Work에서 난이도 조건 충족
-- 네트워크 보안을 위한 계산 작업 제공
-
-## 블록체인의 장점
-
-### 투명성
-
-- 모든 트랜잭션이 공개적으로 기록됨
-- 누구나 블록체인을 검증할 수 있음
-
-### 불변성
-
-- 한번 기록된 데이터는 변경 불가능
-- 해시 체인으로 데이터 무결성 보장
-
-### 분산화
-
-- 중앙 서버 없이 P2P 네트워크로 운영
-- 단일 장애점 제거
-
-### 보안성
-
-- 암호화 기술로 데이터 보호
-- 합의 알고리즘으로 공격 방어
-
-## 실제 사용 사례
-
-### 암호화폐
-
-- Bitcoin, Ethereum 등의 가상 화폐
-- 디지털 자산의 소유권과 거래 기록
-
-### 공급망 관리
-
-- 제품 출처와 이동 경로 추적
-- 위조품 방지 및 투명성 확보
-
-### 의료 데이터
-
-- 환자 기록의 안전한 저장과 공유
-- 데이터 무결성과 개인정보 보호
-
-### 투표 시스템
-
-- 투표 조작 방지
-- 투표 결과의 투명한 검증
+```ts
+const replaceChain = (newBlockchain: Block[]) => {
+  if (
+    isValidChain(newBlockchain) &&
+    newBlockchain.length > getBlockchain().length
+  ) {
+    console.log(
+      'Received blockchain is valid. Replacing current blockchain with received blockchain',
+    )
+    blockchain = newBlockchain
+  } else {
+    console.log('Received blockchain invalid')
+  }
+}
+```
