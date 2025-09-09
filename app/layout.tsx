@@ -5,6 +5,7 @@ import localFont from 'next/font/local'
 import Header from './_components/header'
 import { Main, SidebarProvider } from './_components/sidebar'
 import AppSidebar from './_components/sidebar/app-sidebar'
+import ClientPrismWrapper from './_components/common/prism/prism'
 
 export const metadata: Metadata = {
   description: 'JongMin Chae 개인 블록',
@@ -37,6 +38,7 @@ export default function RootLayout({
           <AppSidebar />
           <Main className="overflow-x-hidden pt-12">{children}</Main>
         </SidebarProvider>
+        <ClientPrismWrapper />
       </body>
     </html>
   )
