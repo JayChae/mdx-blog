@@ -11,7 +11,8 @@
     "lint:es": "eslint '**/*.{js,jsx,ts,tsx}'",
     "lint:es:fix": "eslint '**/*.{js,jsx,ts,tsx}' --fix",
     "format": "prettier '**/*.{js,jsx,ts,tsx}'",
-    "format:fix": "prettier --write '**/*.{js,jsx,ts,tsx}'"
+    "format:fix": "prettier --write '**/*.{js,jsx,ts,tsx}'",
+    "deploy": "next build && touch out/.nojekyll && gh-pages -d out --dotfiles -b main --repo https://github.com/JayChae/jaychae.github.io.git"
   },
   "dependencies": {
     "@radix-ui/react-scroll-area": "^1.2.1",
@@ -37,6 +38,7 @@
     "@titicaca/eslint-config-triple": "^5.2.1",
     "@titicaca/prettier-config-triple": "^1.2.1",
     "@types/eslint-plugin-tailwindcss": "^3",
+    "@types/gh-pages": "^6",
     "@types/mdx": "^2.0.13",
     "@types/node": "^20",
     "@types/prismjs": "^1",
@@ -50,6 +52,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-n": "^17.13.2",
     "eslint-plugin-tailwindcss": "^3.17.5",
+    "gh-pages": "^6.3.0",
     "postcss": "^8",
     "prettier": "^3.4.2",
     "react-hooks": "^1.0.1",
