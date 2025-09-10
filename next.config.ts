@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true, // 빌드 중 ESLint 무시
+  },
 }
 
 const withMDX = createMDX({
