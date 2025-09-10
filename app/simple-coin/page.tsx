@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export default function SimpleCoinPage() {
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto w-full max-w-4xl p-8">
       <h1 className="mb-6 text-4xl font-bold">🚀 Simple Coin 구현 가이드</h1>
 
       <div className="prose prose-lg max-w-none">

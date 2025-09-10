@@ -73,7 +73,7 @@ function ArticleWithNavigation({
   const nextSlug = hasNext ? articleOrder[currentIndex + 1] : null
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto w-full max-w-6xl p-8">
       <article className="prose !max-w-full">
         <Article />
       </article>

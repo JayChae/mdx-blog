@@ -12,7 +12,6 @@ import {
 import { usePathname } from 'next/navigation'
 
 import { cn } from '#/lib/utils'
-import { ScrollArea } from '#/components/ui/scroll-area'
 
 interface SidebarContextType {
   open: boolean
@@ -65,7 +64,7 @@ export function Main({ children, className }: ClassNameProp) {
   const { pinned } = useSidebar()
 
   return (
-    <ScrollArea>
+    <div className="overflow-hidden">
       <main
         className={cn(
           'size-full transition-all duration-300 ease-out',
@@ -75,7 +74,7 @@ export function Main({ children, className }: ClassNameProp) {
       >
         {children}
       </main>
-    </ScrollArea>
+    </div>
   )
 }
 
