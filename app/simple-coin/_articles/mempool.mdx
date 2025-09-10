@@ -40,9 +40,13 @@ app.post('/sendTransaction', (req, res) => {
 })
 ```
 
+## 구조
+
+![](https://github.com/user-attachments/assets/edecd65b-7af9-4573-b503-4b56939a2293)
+
 ## 트랜잭션 생성
 
-트랜잭션을 생성하는 과정은 이전과 동일합니다. 단지, 이번에는 바로 블록을 채굴해서 추가하지 않고, 생성된 트랜잭션을 mempool에 추가g합니다
+트랜잭션을 생성하는 과정은 이전과 동일합니다. 단지, 이번에는 바로 블록을 채굴해서 추가하지 않고, 생성된 트랜잭션을 mempool에 추가합니다
 
 ```ts
 const sendTransaction = (address: string, amount: number): Transaction => {
@@ -62,8 +66,13 @@ const sendTransaction = (address: string, amount: number): Transaction => {
 
 미확인 트랜잭션의 핵심은 네트워크 전체로 전파되고, 결국 어떤 노드가 블록을 채굴하여 그 트랜잭션을 담아준다는 점입니다. 이를 처리하기 위해 미확인 트랜잭션 네트워킹에 대해 다음과 같은 간단한 규칙이 있어야 합니다:
 
-1. 노드가 이전에 본 적 없는 트랜잭션을 받으면, 전체 mempool를 모든 피어에게 전파합니다.
-2. 노드가 다른 노드에 처음 연결될 때, 상대 노드의 mempool를 요청(query)합니다.
+### 1. 이전에 본 적 없는 트랜잭션을 받으면, 전체 mempool를 모든 피어에게 전파한다.
+
+![](https://github.com/user-attachments/assets/d9b83643-7cf9-46e2-b407-cd9cb433dcfe)
+
+### 2. 노드가 다른 노드에 처음 연결될 때, 상대 노드의 mempool를 요청(query)한다.
+
+![](https://github.com/user-attachments/assets/113d06ce-d28e-4c85-82bb-30416141762c)
 
 이를 위해 두 가지 새로운 MessageType을 추가합니다:
 
@@ -79,14 +88,13 @@ enum MessageType {
 
 노드가 트랜잭션을 받았을 때 트랜잭션이 유효한지 검사하고 이전에 없던 거래인지 검사한 후에 mempool에 추가합니다. 만약 추가하는 데 성공했다면, 또다시 mempool를 모든 피어에게 전파합니다.
 
-![]()
-
 ## 트랜잭션 검증
 
 트랜잭션을 mempool에 추가하기 전에 반드시 검증해야 합니다. 기존의 모든 트랜잭션 검증 규칙이 적용됩니다. 예를 들어, 트랜잭션은 올바른 형식을 가져야 하며, 서명이 유효해야 합니다.
 
 그리고 새로운 규칙을 하나 추가해야 합니다.
-트랜잭션의 인풋 중 하나라도 이미 기존 트랜잭션 풀에 존재한다면 그 트랜잭션은 풀에 추가될 수 없습니다.
+
+### 트랜잭션의 인풋 중 하나라도 이미 기존 mempool에 존재한다면 그 트랜잭션은 풀에 추가될 수 없다.
 
 ```ts
 const isValidTxForMempool = (
@@ -111,7 +119,7 @@ const isValidTxForMempool = (
 }
 ```
 
-![]()
+![](https://github.com/user-attachments/assets/f4752032-82eb-4cb2-ae41-49be9d9a311a)
 
 ## mempool에서 블록체인으로
 
@@ -157,8 +165,8 @@ const updateMempool = (unspentTxOuts: UnspentTxOut[]) => {
 }
 ```
 
-![]()
+![](https://github.com/user-attachments/assets/912b9a48-6e45-4e87-9589-02da7e8c7725)
 
 ## 다음 챕터
 
-이제 simple-coin을 쉽게 체험해보기 위해 도커를 설정하고 SPA 웹도 만들어 UI로 확인해보겠습니다.
+이제 simple-coin을 더 쉽게 다룰 수 있도록 위해 도커를 설정하고 SPA 웹을 제작하겠습니다.
