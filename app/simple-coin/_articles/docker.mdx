@@ -1,1 +1,130 @@
 # Simple Docker
+
+블록체인 네트워크가 잘 동작하는지 확인하기 위해서는 여러 노드가 필요합니다.
+노드가 서로 거래를 잘 주고 받는지, 블록체인과 mempool이 잘 동기화 되는지 확인해야 합니다.
+혼자서도 실험할 수 있도록 도커(Docker)를 사용해 3개의 node를 띄워보겠습니다.
+
+<img
+  width=""
+  height=""
+  alt="image"
+  src="https://github.com/user-attachments/assets/ed55b633-2b26-4149-8b14-b7a69d517e99"
+/>
+
+## 도커란?
+
+도커(Docker)는 애플리케이션을 컨테이너(container)라는 독립된 실행 환경에 올려서 실행할 수 있게 해주는 플랫폼입니다.
+컨테이너는 가상의 운영체제를 띄우는 방식인 가상 머신(VM) 과는 다르게, 호스트 OS 위에서 격리된 공간을 제공하기 때문에 가볍고 빠릅니다.
+
+즉, 도커를 사용하면 “내 컴퓨터에서는 잘 되는데 서버에서는 안 돼요” 같은 문제가 줄어듭니다.
+왜냐하면 실행 환경(OS, 라이브러리, 설정)을 그대로 컨테이너 안에 담아 어디서든 똑같이 실행할 수 있기 때문입니다.
+
+### 장점
+
+- 실행 환경을 코드로 관리할 수 있음 (Dockerfile)
+- 동일한 환경을 손쉽게 복제 가능
+- 배포 및 확장이 간편
+
+## 도커 설치하는 법
+
+도커는 운영체제마다 설치 방법이 다르지만, 일반적으로 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 을 설치하는 방식이 가장 쉽습니다.
+
+설치가 완료되면 아래 명령어로 정상 동작 여부를 확인할 수 있습니다.
+
+```bash
+docker --version
+```
+
+## docker-compose란?
+
+여러 개의 컨테이너를 동시에 띄우고 관리하기 위해서는 **docker-compose** 를 사용합니다.
+`docker-compose.yml` 파일에 각 컨테이너(서비스)의 이미지, 포트, 볼륨, 네트워크 설정을 정의해두면,
+아래와 같이 한 줄 명령어로 여러 개의 컨테이너를 동시에 실행할 수 있습니다.
+
+```bash
+docker-compose up
+```
+
+예를 들어 블록체인 노드를 3개 띄우려면, `docker-compose.yml` 에 노드 1, 노드 2, 노드 3을 각각 서비스로 정의하고
+`docker-compose up` 을 실행하면 자동으로 컨테이너 3개가 실행됩니다.
+
+## Dockerfile
+
+Dockerfile은 블록체인 노드 하나를 실행할 수 있는 컨테이너 이미지를 만드는 역할을 합니다. 모든 노드가 이 이미지를 공유하고, 환경 변수(HTTP_PORT, P2P_PORT, PEERS)로 개별 설정만 바꿔서 실행됩니다.
+
+```docker
+FROM node:18-alpine        # Node.js 18 버전의 가벼운 alpine 이미지 기반으로 컨테이너 생성
+
+WORKDIR /app               # 컨테이너 내부 작업 디렉토리 설정
+
+COPY package*.json ./      # package.json, package-lock.json 복사
+RUN npm ci                 # lock 파일 기준으로 패키지 설치 (더 안정적)
+
+COPY src/ ./src/           # 소스 코드 복사
+COPY tsconfig.json ./      # 타입스크립트 설정 복사
+COPY public/ ./public/     # public 폴더 복사 (정적 파일)
+
+RUN npm run build          # 빌드 (ts → js 변환)
+EXPOSE 3001 6001           # HTTP 서버(3001)와 P2P 서버(6001) 포트 오픈
+
+CMD ["node", "dist/main.js"]  # 컨테이너 시작 시 실행할 명령어
+
+
+```
+
+## docker-compose.yml
+
+```yml
+services:
+  node1:
+    build: . # 현재 디렉토리의 Dockerfile로 빌드
+    ports:
+      - '3001:3001' # 호스트 3001 → 컨테이너 3001 (HTTP API)
+      - '6001:6001' # 호스트 6001 → 컨테이너 6001 (P2P 통신)
+    environment:
+      - HTTP_PORT=3001
+      - P2P_PORT=6001
+
+  node2:
+    build: .
+    ports:
+      - '3002:3001' # 외부에서는 3002번으로 접근 가능 (내부는 3001)
+      - '6002:6001'
+    environment:
+      - HTTP_PORT=3001
+      - P2P_PORT=6001
+      - PEERS=ws://node1:6001 # node1과 연결
+    depends_on:
+      - node1 # node1 실행 후 시작
+
+  node3:
+    build: .
+    ports:
+      - '3003:3001'
+      - '6003:6001'
+    environment:
+      - HTTP_PORT=3001
+      - P2P_PORT=6001
+      - PEERS=ws://node2:6001 # node2와 연결
+    depends_on:
+      - node2
+```
+
+## 실행
+
+```bash
+docker-compose up
+```
+
+http://localhost:3001 -> node1  
+http://localhost:3002 -> node2  
+http://localhost:3003 -> node3
+
+각각의 노드가 잘 동기화되는지, 거래를 주고 받는지 확인해 보세요.
+
+## 마무리
+
+simple coin이라는 간단한 암호화폐를 제작해 보았습니다.  
+블록체인, 작업증명, 트랜잭션, mempool,지갑의 개념을 배웠습니다.  
+탈중앙화 되었으며 투명하고 저렴한 암호화폐의 가치를 믿습니다.  
+오너라~ 암호화폐의 시대야!

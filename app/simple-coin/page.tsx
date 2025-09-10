@@ -77,7 +77,7 @@ export default function SimpleCoinPage() {
                   href="/simple-coin/docker"
                   className="text-gray-600 transition-colors hover:text-gray-800"
                 >
-                  도커로 node 3개 띄워서 사용하기
+                  도커로 node 3개 띄워서 테스트
                 </Link>
               </li>
             </ul>
@@ -93,7 +93,7 @@ export default function SimpleCoinPage() {
               <li>Express</li>
               <li>WebSocket: ws</li>
               <li>Crypto: crypto-js & elliptic</li>
-              <li>tailwindcss</li>
+              <li>Tailwindcss</li>
               <li>Docker</li>
             </ul>
           </div>
