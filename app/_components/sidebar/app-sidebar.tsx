@@ -28,11 +28,11 @@ const menuItems: MenuItem[] = [
     href: '/',
     description: 'JongMin Chae',
   },
-  {
-    title: 'Resume',
-    href: '/resume',
-    description: 'JongMin Chae의 이력서',
-  },
+  // {
+  //   title: 'Resume',
+  //   href: '/resume',
+  //   description: 'JongMin Chae의 이력서',
+  // },
   {
     title: 'Simple-coin',
     href: '/simple-coin',

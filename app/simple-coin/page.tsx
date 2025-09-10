@@ -3,12 +3,6 @@ import Link from 'next/link'
 export default function SimpleCoinPage() {
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <div className="mb-6">
-        <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
-          ← 홈으로 돌아가기
-        </Link>
-      </div>
-
       <h1 className="mb-6 text-4xl font-bold">🚀 Simple Coin 구현 가이드</h1>
 
       <div className="prose prose-lg max-w-none">
@@ -78,6 +72,14 @@ export default function SimpleCoinPage() {
                   간단한 SPA 웹페이지 구현
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/simple-coin/docker"
+                  className="text-gray-600 transition-colors hover:text-gray-800"
+                >
+                  도커로 node 3개 띄워서 사용하기
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -86,11 +88,13 @@ export default function SimpleCoinPage() {
               🛠️ 기술 스택
             </h2>
             <ul className="space-y-2 text-gray-700">
-              <li>• TypeScript</li>
-              <li>• Node.js</li>
-              <li>• Express</li>
-              <li>• WebSocket: ws</li>
-              <li>• Crypto: crypto-js & elliptic</li>
+              <li>TypeScript / JavaScript</li>
+              <li>Node.js</li>
+              <li>Express</li>
+              <li>WebSocket: ws</li>
+              <li>Crypto: crypto-js & elliptic</li>
+              <li>tailwindcss</li>
+              <li>Docker</li>
             </ul>
           </div>
         </div>

@@ -10,6 +10,7 @@ import Transaction from '../_articles/transaction.mdx'
 import Wallet from '../_articles/wallet.mdx'
 import Mempool from '../_articles/mempool.mdx'
 import Spa from '../_articles/spa.mdx'
+import Docker from '../_articles/docker.mdx'
 
 import ClientPrismWrapper from '#/app/_components/common/prism'
 
@@ -28,6 +29,7 @@ const articleOrder = [
   'wallet',
   'mempool',
   'spa',
+  'docker',
 ]
 
 const articleComponents: Record<string, ComponentType> = {
@@ -38,6 +40,7 @@ const articleComponents: Record<string, ComponentType> = {
   wallet: Wallet,
   mempool: Mempool,
   spa: Spa,
+  docker: Docker,
 }
 
 async function ProjectPage({ params }: ProjectPageProps) {
@@ -120,6 +123,7 @@ export async function generateStaticParams() {
     { id: 'wallet' },
     { id: 'mempool' },
     { id: 'spa' },
+    { id: 'docker' },
   ]
 }
 
