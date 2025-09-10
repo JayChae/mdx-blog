@@ -1,203 +1,182 @@
-# 간단한 SPA 웹페이지 구현
+# Simple SPA
 
-블록체인 네트워크의 상태를 실시간으로 확인할 수 있는 웹 인터페이스입니다.
+현재 CLI를 통하여 거래를 만들고 블록을 채굴할 수 있습니다. 그러나 CLI에 명령어를 치는 것보다 UI를 통하여 사용하면 더 편하겠죠? SPA(Single Page Application)를 도입해 사용성을 개선해 봅시다.
 
-## SPA 아키텍처
+## SPA(Single Page Application)이란?
 
-Single Page Application의 기본 구조:
+SPA(싱글 페이지 애플리케이션)는 전통적인 다중 페이지 방식(Multi-Page Application, MPA)과 달리
+초기 로드 시 하나의 HTML 페이지와 자바스크립트 번들을 받아온 뒤,
+이후의 화면 전환은 서버로부터 전체 페이지를 다시 로드하지 않고 클라이언트(브라우저)에서 자바스크립트로 라우팅과 뷰 업데이트를 처리하는 웹 애플리케이션입니다.
 
-```javascript
-function BlockchainDashboard() {
-  const [blocks, setBlocks] = useState([])
-  const [transactions, setTransactions] = useState([])
-  const [networkStats, setNetworkStats] = useState({})
+### SPA의 동작 원리 (간단히)
 
-  useEffect(() => {
-    fetchBlockchainData()
-    const interval = setInterval(fetchBlockchainData, 10000) // 10초마다 갱신
-    return () => clearInterval(interval)
-  }, [])
+1. 사용자가 앱에 접속하면 초기 HTML/CSS/JS 번들을 로드합니다.
+2. URL을 감지하여 적절한 컴포넌트를 렌더링합니다.
 
-  return (
-    <div className="dashboard">
-      <Header />
-      <NetworkStats stats={networkStats} />
-      <BlockList blocks={blocks} />
-      <TransactionList transactions={transactions} />
-    </div>
-  )
-}
+## 요구사항
+
+### home("/")
+
+explorer로 이동하는 버튼
+wallet으로 이동하는 버튼
+간단한 설명
+
+<img
+  width=""
+  height=""
+  alt="image"
+  src="https://github.com/user-attachments/assets/5f6acc1b-d28d-4f8c-a1b4-c4a09c27bc09"
+/>
+
+### explorer("/explorer")
+
+블록체인 확인  
+블록 검색 bt index or hash
+
+<img
+  width=""
+  height=""
+  alt="image"
+  src="https://github.com/user-attachments/assets/b86f67f2-cf20-4cc9-a72c-4875542a84a6"
+/>
+
+### wallet("/wallet")
+
+잔고 확인  
+주소 확인  
+코인 보내기
+
+<img
+  width=""
+  height=""
+  alt="image"
+  src="https://github.com/user-attachments/assets/5a299a08-b5b8-41b5-af90-b62fee206bf3"
+/>
+
+### mempool & peers & mining(explorer와 wallet 페이지 하단)
+
+mempool 확인  
+연결된 노드 확인  
+블록 채굴(mempool transaction 블록에 담기)
+
+<img
+  width=""
+  height=""
+  alt="image"
+  src="https://github.com/user-attachments/assets/622fe360-a7a3-49b6-b20b-ddf78103eda3"
+/>
+
+## SPA를 위한 endpoints
+
+SPA(Single Page Application)을 지원하기 위해 Express 서버에서 라우팅을 처리하는 방식입니다.
+
+### 정적 파일 제공
+
+`public` 디렉토리를 정적 파일 제공 폴더로 지정합니다. 따라서 html, JS 같은 정적 자원은 별도의 라우팅 없이 자동으로 서비스됩니다.
+
+```ts
+app.use(express.static(path.join(__dirname, '..', 'public')))
 ```
 
-## 실시간 데이터 관리
+### 모든 경로를 index.html로 처리
 
-WebSocket을 활용한 실시간 데이터 업데이트:
+```ts
+app.get('/explorer', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'))
+})
 
-```javascript
-useEffect(() => {
-  const ws = new WebSocket('ws://localhost:8080')
-
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    if (data.type === 'new_block') {
-      setBlocks((prev) => [data.block, ...prev])
-    } else if (data.type === 'new_transaction') {
-      setTransactions((prev) => [data.transaction, ...prev])
-    }
-  }
-
-  return () => ws.close()
-}, [])
+app.get('/wallet', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'))
+})
 ```
 
-## 컴포넌트 구조
+👉 사용자가 `/explorer`, `/wallet` 경로로 접근했을 때, 실제 서버에 `/explorer.html`와 `/wallet.html`이 아닌 `index.html`을 응답으로 줍니다. SPA는 index.html 안에서 해당 경로에 맞는 컴포넌트를 렌더링합니다.
 
-### 네트워크 통계 컴포넌트
-
-```javascript
-function NetworkStats({ stats }) {
-  return (
-    <div className="stats-grid">
-      <StatCard title="블록 높이" value={stats.blockHeight} />
-      <StatCard title="총 트랜잭션" value={stats.totalTransactions} />
-      <StatCard title="네트워크 해시레이트" value={stats.hashRate} />
-      <StatCard title="연결된 노드" value={stats.connectedNodes} />
-    </div>
-  )
-}
+```ts
+app.get('/wallet', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'))
+})
 ```
 
-### 블록 리스트 컴포넌트
+## 정적 파일(html, js)
 
-```javascript
-function BlockList({ blocks }) {
-  return (
-    <div className="block-list">
-      <h3>최근 블록들</h3>
-      {blocks.map((block) => (
-        <BlockCard key={block.hash} block={block} />
-      ))}
-    </div>
-  )
-}
+### tailwind css
+
+디자인은 tailwind를 사용하고 CDN을 통해 가져옵니다.
+
+```html
+<!-- index.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- tailwind -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Simple Coin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body class="bg-white min-h-screen">
+    .....
+  </body>
+</html>
 ```
 
-### 트랜잭션 리스트 컴포넌트
+### html
 
-```javascript
-function TransactionList({ transactions }) {
-  return (
-    <div className="transaction-list">
-      <h3>최근 트랜잭션들</h3>
-      {transactions.map((tx) => (
-        <TransactionCard key={tx.id} transaction={tx} />
-      ))}
-    </div>
-  )
-}
+모든 경로의 UI를 작성 후 차후 자바스크립트로 해당 경로에 해당하는 컴포넌트를 js로 렌더링합니다.
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    ...
+  </head>
+  <body class="bg-white min-h-screen">
+    <!-- Header -->
+    <header class="bg-gray-50 shadow-md border-b border-gray-300">...</header>
+
+    <!-- Home Page -->
+    <div id="homePage" class="page active">...</div>
+
+    <!-- Explorer Page -->
+    <div id="explorerPage" class="page">...</div>
+
+    <!-- Wallet Page -->
+    <div id="walletPage" class="page">...</div>
+  </body>
+</html>
 ```
 
-## 상태 관리
+### js
 
-React의 useReducer를 활용한 복잡한 상태 관리:
+```html
+...
+    <!-- JavaScript Modules -->
 
-```javascript
-const initialState = {
-  blocks: [],
-  transactions: [],
-  loading: false,
-  error: null,
-}
+     <!-- api handlers -->
+    <script src="js/api.js"></script>
 
-function blockchainReducer(state, action) {
-  switch (action.type) {
-    case 'FETCH_START':
-      return { ...state, loading: true }
-    case 'FETCH_SUCCESS':
-      return {
-        ...state,
-        loading: false,
-        blocks: action.payload.blocks,
-        transactions: action.payload.transactions,
-      }
-    case 'FETCH_ERROR':
-      return { ...state, loading: false, error: action.payload }
-    default:
-      return state
-  }
-}
+    <!-- UI 렌더링 관련 함수들 -->
+    <script src="js/navigation.js"></script>
+
+    <!-- Api로 받은 결과 렌더링 -->
+    <script src="js/ui.js"></script>
+
+    <!-- 메인 애플리케이션 로직 -->
+    <script src="js/app.js"></script>
+  </body>
+</html>
 ```
 
-## 사용자 인터랙션
+## 확인
 
-### 트랜잭션 생성 폼
-
-```javascript
-function TransactionForm({ onSubmit }) {
-  const [formData, setFormData] = useState({
-    toAddress: '',
-    amount: '',
-    fee: '',
-  })
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSubmit(formData)
-    setFormData({ toAddress: '', amount: '', fee: '' })
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        placeholder="받는 주소"
-        value={formData.toAddress}
-        onChange={(e) =>
-          setFormData({ ...formData, toAddress: e.target.value })
-        }
-      />
-      <input
-        type="number"
-        placeholder="금액"
-        value={formData.amount}
-        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-      />
-      <button type="submit">트랜잭션 전송</button>
-    </form>
-  )
-}
+```bash
+npm start
 ```
 
-## 반응형 디자인
+http://localhost:3001/ 에 들어가면 확인할 수 있습니다.
 
-모든 디바이스에서 잘 작동하는 반응형 UI:
+이제는 UI로 블록체인,잔고,주소를 확인하고 블록을 채굴하거나 거래를 발생 시킬 수 있습니다.
 
-```css
-.dashboard {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-  padding: 1rem;
-}
+## 다음 챕터
 
-@media (min-width: 768px) {
-  .dashboard {
-    grid-template-columns: 1fr 2fr;
-  }
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-```
-
-## 성능 최적화
-
-대용량 데이터를 효율적으로 처리하기 위한 최적화:
-
-- **가상화**: 긴 리스트를 위한 react-window 사용
-- **메모이제이션**: React.memo와 useMemo 활용
-- **코드 스플리팅**: 라우트별 코드 분할
-- **지연 로딩**: 컴포넌트 지연 로딩
+현재는 연결된 노드가 없습니다. 블록체인 네트워크가 잘 동작하는지, 서로 거래를 주고 받을 수 있는지 확인할 수가 없습니다. 혼자서도 거래를 주고받아 볼 수 있도록 도커를 사용해서 node를 여러 개를 띄워 보겠습니다.
